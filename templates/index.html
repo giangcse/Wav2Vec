@@ -36,24 +36,24 @@
                     <div class="card-body">
                         <h5 class="card-title">Công cụ chuyển giọng nói thành văn bản</h5>
                         <br>
-                        <form method="post" enctype="multipart/form-data">
+                        <form method="POST" enctype="multipart/form-data" action="/">
                             <div class="mb-3">
                                 <label for="file" class="form-label">Chọn file mp3/wav</label>
-                                <input class="form-control" type="file" id="file" accept=".wav, .mp3" placeholder="Chọn file mp3 hoặc wav">
+                                <input class="form-control" type="file" id="file" name="file" accept=".wav, .mp3" placeholder="Chọn file mp3 hoặc wav">
                             </div>
                             <button type="submit" class="btn btn-outline-success col-md-3 offset-md-9">Bắt đầu</button>
                         </form>
                         {% if result %}
                           <div class="mb-3">
                             <label for="Greedy" class="form-label">Greedy</label>
-                            <textarea class="form-control" id="Greedy" rows="3">
-                              {{result.greedy}}
+                            <textarea class="form-control" id="Greedy" rows="7">
+                              {{- result.greedy -}}
                             </textarea>
                           </div>
                           <div class="mb-3">
                             <label for="Beam" class="form-label">Beam</label>
-                            <textarea class="form-control" id="Beam" rows="3">
-                              {{result.beam}}
+                            <textarea class="form-control" id="Beam" rows="7">
+                              {{- result.beam -}}
                             </textarea>
                           </div>
                         {% endif %}

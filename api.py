@@ -51,14 +51,11 @@ class API:
         async def root(request: Request):
             return self.templates.TemplateResponse('index.html', context={'request': request})
         
-        @self.app.post("/convert")
-        async def convert(file: UploadFile = File(...)):
-            try:
-                with open(os.path.join('static', 'uploaded', file.filename), 'wb') as audio:
-                    shutil.copyfileobj(file.file, audio)
-                return self.templates.TemplateResponse('index.html', context={'request': Request, 'result': self.wav2vec(os.path.join('static', 'uploaded', file.filename))})
-            except Exception as e:
-                return ({"error": str(Exception)})
+        @self.app.post("/")
+        async def upload(request: Request, file: UploadFile = File (...)):
+            with open(os.path.join('static', file.filename), 'wb') as pdf:
+                shutil.copyfileobj(file.file, pdf)
+            return self.templates.TemplateResponse('index.html', context={'request': request, 'result': self.wav2vec(os.path.join('static', file.filename))})
 
     def get_decoder_ngram_model(self, tokenizer, ngram_lm_path):
         vocab_dict = tokenizer.get_vocab()
@@ -87,7 +84,12 @@ class API:
         return batch
 
     def wav2vec(self, audio_path):
-        ds = self.map_to_array({"file": audio_path})
+        y, sr = librosa.load(audio_path, mono=False, sr=16000)
+        y_mono = librosa.to_mono(y)
+        if os.path.isfile('./cache/mono.wav'):
+            os.remove('./cache/mono.wav')
+        sf.write('./cache/mono.wav', y_mono, 16000)
+        ds = self.map_to_array({"file": './cache/mono.wav'})
         # infer model
         input_values = self.processor(
             ds["speech"], 
@@ -101,9 +103,10 @@ class API:
         pred_ids = torch.argmax(logits, dim=-1)
         greedy_search_output = self.processor.decode(pred_ids)
         beam_search_output = self.ngram_lm_model.decode(logits.cpu().detach().numpy(), beam_width=500)
-        return {"greedy": greedy_search_output, "beam": beam_search_output}
+        return {'greedy': str(greedy_search_output), 'beam': str(beam_search_output)}
 
 api = API()
 
 if __name__=='__main__':
     uvicorn.run('api:api.app', host='0.0.0.0', port=88, reload=True)
+    # api.wav2vec(r'static/test.mp3')
