@@ -37,8 +37,8 @@ class API:
         )
         # Model Initial
         self.cache_dir = './cache/'
-        self.processor = Wav2Vec2Processor.from_pretrained("nguyenvulebinh/wav2vec2-base-vietnamese-250h", cache_dir=cache_dir)
-        self.model = Wav2Vec2ForCTC.from_pretrained("nguyenvulebinh/wav2vec2-base-vietnamese-250h", cache_dir=cache_dir)
+        self.processor = Wav2Vec2Processor.from_pretrained("nguyenvulebinh/wav2vec2-base-vietnamese-250h", cache_dir=self.cache_dir)
+        self.model = Wav2Vec2ForCTC.from_pretrained("nguyenvulebinh/wav2vec2-base-vietnamese-250h", cache_dir=self.cache_dir)
         self.lm_file = hf_bucket_url("nguyenvulebinh/wav2vec2-base-vietnamese-250h", filename='vi_lm_4grams.bin.zip')
         self.lm_file = cached_path(self.lm_file,cache_dir=self.cache_dir)
         with zipfile.ZipFile(self.lm_file, 'r') as zip_ref:
