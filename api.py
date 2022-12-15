@@ -54,9 +54,9 @@ class API:
         @self.app.post("/convert")
         async def convert(file: UploadFile = File(...)):
             try:
-                with open(f'static\uploaded\{file.filename}', 'wb') as audio:
+                with open(os.path.join('static', 'uploaded', file.filename), 'wb') as audio:
                     shutil.copyfileobj(file.file, audio)
-                return self.templates.TemplateResponse('index.html', context={'request': Request, 'result': self.wav2vec(f'static\uploaded\{file.filename}')})
+                return self.templates.TemplateResponse('index.html', context={'request': Request, 'result': self.wav2vec(os.path.join('static', 'uploaded', file.filename))})
             except Exception as e:
                 return ({"error": str(Exception)})
 
