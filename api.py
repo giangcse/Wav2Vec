@@ -51,14 +51,11 @@ class API:
         async def root(request: Request):
             return self.templates.TemplateResponse('index.html', context={'request': request})
         
-        @self.app.post("/convert")
-        async def convert(file: UploadFile = File(...)):
-            try:
-                with open(os.path.join('static', 'uploaded', file.filename), 'wb') as audio:
-                    shutil.copyfileobj(file.file, audio)
-                return self.templates.TemplateResponse('index.html', context={'request': Request, 'result': self.wav2vec(os.path.join('static', 'uploaded', file.filename))})
-            except Exception as e:
-                return ({"error": str(Exception)})
+        @self.app.post("/")
+        async def upload(request: Request, file: UploadFile = File (...)):
+            with open(os.path.join('static', file.filename), 'wb') as pdf:
+                shutil.copyfileobj(file.file, pdf)
+            return self.templates.TemplateResponse('index.html', context={'request': request, 'result': self.wav2vec(os.path.join('static', file.filename))})
 
     def get_decoder_ngram_model(self, tokenizer, ngram_lm_path):
         vocab_dict = tokenizer.get_vocab()
