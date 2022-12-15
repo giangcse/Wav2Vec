@@ -36,12 +36,12 @@
                     <div class="card-body">
                         <h5 class="card-title">Công cụ chuyển giọng nói thành văn bản</h5>
                         <br>
-                        <form method="post" enctype="multipart/form-data"></form>
+                        <form method="post" enctype="multipart/form-data">
                             <div class="mb-3">
-                                <label for="formFile" class="form-label">Chọn file mp3/wav</label>
-                                <input class="form-control" type="file" id="formFile" accept=".wav, .mp3" placeholder="Chọn file mp3 hoặc wav">
+                                <label for="file" class="form-label">Chọn file mp3/wav</label>
+                                <input class="form-control" type="file" id="file" accept=".wav, .mp3" placeholder="Chọn file mp3 hoặc wav">
                             </div>
-                            <button type="button" class="btn btn-outline-success col-md-3 offset-md-9">Bắt đầu</button>
+                            <button type="submit" class="btn btn-outline-success col-md-3 offset-md-9">Bắt đầu</button>
                         </form>
                         {% if result %}
                           <div class="mb-3">
