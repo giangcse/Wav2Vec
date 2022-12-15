@@ -51,7 +51,7 @@ class API:
         async def root(request: Request):
             return self.templates.TemplateResponse('index.html', context={'request': request})
         
-        @self.app.post("/convert")
+        @self.app.post("/upload")
         async def convert(file: UploadFile = File(...)):
             try:
                 with open(os.path.join('static', 'uploaded', file.filename), 'wb') as audio:
