@@ -25,6 +25,7 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 class API:
     def __init__(self) -> None:
         # API Initial
+        print('*********** API Initial ***********')
         self.app = FastAPI()
         self.app.mount("/static", StaticFiles(directory="static"), name="static")
         self.templates = Jinja2Templates(directory="templates/")
@@ -36,16 +37,20 @@ class API:
             allow_headers=['*']
         )
         # Model Initial
+        print('*********** Model Initial ***********')
         self.cache_dir = './cache/'
         self.processor = Wav2Vec2Processor.from_pretrained("nguyenvulebinh/wav2vec2-base-vietnamese-250h", cache_dir=self.cache_dir)
         self.model = Wav2Vec2ForCTC.from_pretrained("nguyenvulebinh/wav2vec2-base-vietnamese-250h", cache_dir=self.cache_dir)
         self.lm_file = hf_bucket_url("nguyenvulebinh/wav2vec2-base-vietnamese-250h", filename='vi_lm_4grams.bin.zip')
         self.lm_file = cached_path(self.lm_file,cache_dir=self.cache_dir)
+        print('*********** Model OK ***********')
+        print('*********** get_decoder_ngram_model ***********')
         with zipfile.ZipFile(self.lm_file, 'r') as zip_ref:
             zip_ref.extractall(self.cache_dir)
         self.lm_file = self.cache_dir + 'vi_lm_4grams.bin'
 
         self.ngram_lm_model = self.get_decoder_ngram_model(self.processor.tokenizer, self.lm_file)
+        print('*********** get_decoder_ngram_model OK ***********')
 
         @self.app.get("/")
         async def root(request: Request):
@@ -86,27 +91,40 @@ class API:
     def wav2vec(self, audio_path):
         y, sr = librosa.load(audio_path, mono=False, sr=16000)
         y_mono = librosa.to_mono(y)
-        if os.path.isfile('./cache/mono.wav'):
-            os.remove('./cache/mono.wav')
-        sf.write('./cache/mono.wav', y_mono, 16000)
-        ds = self.map_to_array({"file": './cache/mono.wav'})
+        chunk_duration = 5 # sec
+        padding_duration = 1 # sec
+        sample_rate = 16000
+
+        chunk_len = chunk_duration*sample_rate
+        input_padding_len = int(padding_duration*sample_rate)
+        output_padding_len = self.model._get_feat_extract_output_lengths(input_padding_len)
+        # if os.path.isfile('./cache/mono.wav'):
+        #     os.remove('./cache/mono.wav')
+        # sf.write('./cache/mono.wav', y_mono, 16000)
+
+
+        # ds = self.map_to_array({"file": './cache/mono.wav'})
         # infer model
-        input_values = self.processor(
-            ds["speech"], 
-            sampling_rate=ds["sampling_rate"], 
-            return_tensors="pt"
-        ).input_values
-        # ).input_values.to("cuda")
-        # model.to("cuda")
-        logits = self.model(input_values).logits[0]
-        # decode ctc output
-        pred_ids = torch.argmax(logits, dim=-1)
-        greedy_search_output = self.processor.decode(pred_ids)
-        beam_search_output = self.ngram_lm_model.decode(logits.cpu().detach().numpy(), beam_width=500)
-        return {'greedy': str(greedy_search_output), 'beam': str(beam_search_output)}
+        all_preds = []
+        for start in range(input_padding_len, len(y_mono)-input_padding_len, chunk_len):
+            chunk = y_mono[start-input_padding_len:start+chunk_len+input_padding_len]
+            input_values = self.processor(
+                chunk, 
+                sampling_rate=sample_rate, 
+                return_tensors="pt"
+            ).input_values
+            # ).input_values.to("cuda")
+            # model.to("cuda")
+            logits = self.model(input_values).logits[0]
+            # decode ctc output
+            pred_ids = torch.argmax(logits, dim=-1)
+            greedy_search_output = self.processor.decode(pred_ids)
+            beam_search_output = self.ngram_lm_model.decode(logits.cpu().detach().numpy(), beam_width=500)
+            print({'greedy': str(greedy_search_output), 'beam': str(beam_search_output)})
+        return('ok')
 
 api = API()
 
 if __name__=='__main__':
-    uvicorn.run('api:api.app', host='0.0.0.0', port=88, reload=True)
+    uvicorn.run('api:api.app', host='0.0.0.0', port=9090)
     # api.wav2vec(r'static/test.mp3')
