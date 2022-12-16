@@ -45,15 +45,9 @@
                         </form>
                         {% if result %}
                           <div class="mb-3">
-                            <label for="Greedy" class="form-label">Greedy</label>
-                            <textarea class="form-control" id="Greedy" rows="7">
-                              {{- result.greedy -}}
-                            </textarea>
-                          </div>
-                          <div class="mb-3">
                             <label for="Beam" class="form-label">Beam</label>
                             <textarea class="form-control" id="Beam" rows="7">
-                              {{- result.beam -}}
+                              {{- result -}}
                             </textarea>
                           </div>
                         {% endif %}

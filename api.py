@@ -7,6 +7,7 @@ import soundfile as sf
 import torch
 import kenlm
 import librosa
+import numpy as np
 
 from fastapi import FastAPI, Form, File, UploadFile
 from fastapi.requests import Request
@@ -21,6 +22,9 @@ from datasets import load_dataset
 from pyctcdecode import Alphabet, BeamSearchDecoderCTC, LanguageModel
 from transformers.file_utils import cached_path, hf_bucket_url
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
+
+from pydub import AudioSegment
+from pydub.silence import split_on_silence
 
 class API:
     def __init__(self) -> None:
@@ -60,7 +64,7 @@ class API:
         async def upload(request: Request, file: UploadFile = File (...)):
             with open(os.path.join('static', file.filename), 'wb') as pdf:
                 shutil.copyfileobj(file.file, pdf)
-            return self.templates.TemplateResponse('index.html', context={'request': request, 'result': self.wav2vec(os.path.join('static', file.filename))})
+            return self.templates.TemplateResponse('index.html', context={'request': request, 'result': self.wav2vec_chunk(os.path.join('static', file.filename))})
 
     def get_decoder_ngram_model(self, tokenizer, ngram_lm_path):
         vocab_dict = tokenizer.get_vocab()
@@ -88,23 +92,18 @@ class API:
         batch["sampling_rate"] = sampling_rate
         return batch
 
-    def wav2vec(self, audio_path):
+    def wav2vec_chunk(self, audio_path):
         y, sr = librosa.load(audio_path, mono=False, sr=16000)
         y_mono = librosa.to_mono(y)
-        chunk_duration = 5 # sec
-        padding_duration = 1 # sec
+        chunk_duration = 10 # sec
+        padding_duration = 0 # sec
         sample_rate = 16000
 
         chunk_len = chunk_duration*sample_rate
         input_padding_len = int(padding_duration*sample_rate)
         output_padding_len = self.model._get_feat_extract_output_lengths(input_padding_len)
-        # if os.path.isfile('./cache/mono.wav'):
-        #     os.remove('./cache/mono.wav')
-        # sf.write('./cache/mono.wav', y_mono, 16000)
 
-
-        # ds = self.map_to_array({"file": './cache/mono.wav'})
-        # infer model
+        beam_list = ''
         all_preds = []
         for start in range(input_padding_len, len(y_mono)-input_padding_len, chunk_len):
             chunk = y_mono[start-input_padding_len:start+chunk_len+input_padding_len]
@@ -118,13 +117,33 @@ class API:
             logits = self.model(input_values).logits[0]
             # decode ctc output
             pred_ids = torch.argmax(logits, dim=-1)
-            greedy_search_output = self.processor.decode(pred_ids)
+            # greedy_search_output = self.processor.decode(pred_ids)
             beam_search_output = self.ngram_lm_model.decode(logits.cpu().detach().numpy(), beam_width=500)
-            print({'greedy': str(greedy_search_output), 'beam': str(beam_search_output)})
-        return('ok')
+            beam_list+= (beam_search_output) + ' '
+        return beam_list
+
+    def split_audio_on_silence(self, audio_path):
+        #reading from audio mp3 file
+        sound = AudioSegment.from_mp3(audio_path)
+
+        # spliting audio files
+        audio_chunks = split_on_silence(sound, min_silence_len=500, silence_thresh=-40 )
+
+        # Create new folder with name of audio
+        head, tail = os.path.split(audio_path)
+        if not os.path.exists(os.path.join('static', tail.split('.')[0])):
+            os.mkdir(os.path.join('static', tail.split('.')[0]))
+        
+        list_of_dir = []
+        #loop is used to iterate over the output list
+        for i, chunk in enumerate(audio_chunks):
+            output_file = "chunk{0}.mp3".format(i)
+            chunk.export(os.path.join('static', tail.split('.')[0], output_file), format="mp3")
+            list_of_dir.append(os.path.join('static', tail.split('.')[0], output_file))
+        return list_of_dir
+            
 
 api = API()
 
 if __name__=='__main__':
-    uvicorn.run('api:api.app', host='0.0.0.0', port=9090)
-    # api.wav2vec(r'static/test.mp3')
+    uvicorn.run('api:api.app', host='0.0.0.0', port=9090, reload=True)
