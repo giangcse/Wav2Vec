@@ -27,6 +27,10 @@ from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 from pydub import AudioSegment
 from pydub.silence import split_on_silence
 
+class Delete_audio(BaseModel):
+    username: str
+    audio_name: str
+
 class API:
     def __init__(self) -> None:
         # Khởi tạo thông tin kết nối đến Database
@@ -65,7 +69,20 @@ class API:
         @self.app.get("/")
         async def root(request: Request):
             return self.templates.TemplateResponse('index.html', context={'request': request})
-        
+
+        @self.app.post("/delete")
+        async def delete(request: Request, body: Delete_audio):
+            find = self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name)))
+            file_path = find.fetchone()[0]
+            if(os.path.exists(file_path)):
+                os.remove(file_path)
+                self.cursor.execute("DELETE FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name)))
+                self.cursor.commit()
+                if self.cursor.rowcount > 0:
+                    return JSONResponse(status_code=200, content="Deleted")
+            else:
+                return JSONResponse(status_code=500, content="Delete failed")
+
         @self.app.post("/")
         async def upload(request: Request, file: UploadFile = File (...)):
             username = self.cursor.execute('SELECT USERNAME FROM users WHERE USERNAME = ?', ('admin', )).fetchone()[0]
@@ -73,19 +90,26 @@ class API:
                 os.mkdir(os.path.join('static', username))
             with open(os.path.join('static', username, file.filename), 'wb') as audio:
                 shutil.copyfileobj(file.file, audio)
-            storage = self.cursor.execute("INSERT INTO audios(AUDIO_NAME, USERNAME) VALUES (?, ?)", (str(os.path.join('static', username, file.filename)), str(username)))
-            return self.templates.TemplateResponse('index.html', context={'request': request, 'result': os.path.join('static', username, file.filename)})
+            try:    
+                storage = self.cursor.execute("INSERT INTO audios(AUDIO_NAME, USERNAME) VALUES (?, ?)", (str(os.path.join('static', username, file.filename)), str(username)))
+                self.connection_db.commit()
+            except Exception:
+                pass
+            return self.templates.TemplateResponse('index.html', context={'request': request, 'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ?", (str(username),))]})
 
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
             await websocket.accept()
+            with open('config.json', encoding='utf8') as f:
+                config = json.loads(f.read())
             while True:
                 data = await websocket.receive_text()
+                # audios = self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ?", (str(data), )).fetchall()
                 y, sr = librosa.load(data, mono=False, sr=16000)
                 y_mono = librosa.to_mono(y)
-                chunk_duration = 10 # sec
-                padding_duration = 0 # sec
-                sample_rate = 16000
+                chunk_duration = config['chunk_duration'] # sec
+                padding_duration = config['padding_duration'] # sec
+                sample_rate = config['sample_rate']
 
                 chunk_len = chunk_duration*sample_rate
                 input_padding_len = int(padding_duration*sample_rate)

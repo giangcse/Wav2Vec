@@ -41,24 +41,38 @@
                                 <label for="file" class="form-label">Chọn file mp3/wav</label>
                                 <input class="form-control" type="file" id="file" name="file" accept=".wav, .mp3" placeholder="Chọn file mp3 hoặc wav">
                             </div>
-                            <button type="submit" class="btn btn-outline-success col-md-3 offset-md-9">Bắt đầu</button>
+                            <button type="submit" class="btn btn-outline-success col-md-3 offset-md-9">Upload</button>
                         </form>
-                        {% if result %}
+                        <br>
+                        <form onsubmit="sendMessage(event)">
                           <div class="mb-3">
-                            <label for="Beam" class="form-label">Beam</label>
-                            <textarea class="form-control" id="Beam" rows="7">
-                              {{- result -}}
-                            </textarea>
+                            <select class="form-select" aria-label="Default select example"  id="audio_name">
+                              {%- for i in audios -%}
+                              <option value="{{-i-}}">{{-i-}}</option>
+                              {%- endfor -%}
+                            </select>
                           </div>
-                          <textarea style="display: none;" id="file_path">
-                            {{- result -}}
+                          <button type="submit" class="btn btn-outline-success col-md-3 offset-md-9">Bắt đầu</button>
+                        </form>
+                        <div class="mb-3">
+                          <label for="result" class="form-label">Kết quả</label>
+                          <textarea class="form-control" id="result" rows="7">
                           </textarea>
+                        </div>
                           <script>
-                            $( document ).ready(function() {
-                                localStorage.setItem('file_path', document.getElementById('file_path').value)
-                            });
-                          </script>
-                        {% endif %}
+                            var ws = new WebSocket("ws://10.91.13.57:9090/ws");
+                            let text = '';
+                            ws.onmessage = function(event) {
+                                text += event.data + ' ';
+                                document.getElementById('result').value = text;
+                            };
+                            function sendMessage(event) {
+                                text = '';
+                                let audio = $("#audio_name").val();
+                                ws.send(audio)
+                                event.preventDefault()
+                            }
+                        </script>
                     </div>
                   </div>
             </div>
