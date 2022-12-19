@@ -8,8 +8,9 @@ import torch
 import kenlm
 import librosa
 import numpy as np
+import sqlite3
 
-from fastapi import FastAPI, Form, File, UploadFile
+from fastapi import FastAPI, Form, File, UploadFile, WebSocket
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
@@ -28,6 +29,11 @@ from pydub.silence import split_on_silence
 
 class API:
     def __init__(self) -> None:
+        # Khởi tạo thông tin kết nối đến Database
+        print('*********** Database connection initial ***********')
+        self.database = 'database.db'
+        self.connection_db = sqlite3.connect(self.database, check_same_thread=False)
+        self.cursor = self.connection_db.cursor()
         # API Initial
         print('*********** API Initial ***********')
         self.app = FastAPI()
@@ -62,9 +68,46 @@ class API:
         
         @self.app.post("/")
         async def upload(request: Request, file: UploadFile = File (...)):
-            with open(os.path.join('static', file.filename), 'wb') as pdf:
-                shutil.copyfileobj(file.file, pdf)
-            return self.templates.TemplateResponse('index.html', context={'request': request, 'result': self.wav2vec_chunk(os.path.join('static', file.filename))})
+            username = self.cursor.execute('SELECT USERNAME FROM users WHERE USERNAME = ?', ('admin', )).fetchone()[0]
+            if not os.path.exists(os.path.join('static', username)):
+                os.mkdir(os.path.join('static', username))
+            with open(os.path.join('static', username, file.filename), 'wb') as audio:
+                shutil.copyfileobj(file.file, audio)
+            storage = self.cursor.execute("INSERT INTO audios(AUDIO_NAME, USERNAME) VALUES (?, ?)", (str(os.path.join('static', username, file.filename)), str(username)))
+            return self.templates.TemplateResponse('index.html', context={'request': request, 'result': os.path.join('static', username, file.filename)})
+
+        @self.app.websocket("/ws")
+        async def websocket_endpoint(websocket: WebSocket):
+            await websocket.accept()
+            while True:
+                data = await websocket.receive_text()
+                y, sr = librosa.load(data, mono=False, sr=16000)
+                y_mono = librosa.to_mono(y)
+                chunk_duration = 10 # sec
+                padding_duration = 0 # sec
+                sample_rate = 16000
+
+                chunk_len = chunk_duration*sample_rate
+                input_padding_len = int(padding_duration*sample_rate)
+                output_padding_len = self.model._get_feat_extract_output_lengths(input_padding_len)
+
+                beam_list = ''
+                all_preds = []
+                for start in range(input_padding_len, len(y_mono)-input_padding_len, chunk_len):
+                    chunk = y_mono[start-input_padding_len:start+chunk_len+input_padding_len]
+                    input_values = self.processor(
+                        chunk, 
+                        sampling_rate=sample_rate, 
+                        return_tensors="pt"
+                    ).input_values
+                    # ).input_values.to("cuda")
+                    # model.to("cuda")
+                    logits = self.model(input_values).logits[0]
+                    # decode ctc output
+                    pred_ids = torch.argmax(logits, dim=-1)
+                    # greedy_search_output = self.processor.decode(pred_ids)
+                    beam_search_output = self.ngram_lm_model.decode(logits.cpu().detach().numpy(), beam_width=500)
+                    await websocket.send_text(f"{beam_search_output}")
 
     def get_decoder_ngram_model(self, tokenizer, ngram_lm_path):
         vocab_dict = tokenizer.get_vocab()
