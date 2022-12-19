@@ -72,16 +72,12 @@ class API:
 
         @self.app.post("/delete")
         async def delete(request: Request, body: Delete_audio):
-            find = self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name)))
-            file_path = find.fetchone()[0]
-            if(os.path.exists(file_path)):
-                os.remove(file_path)
-                self.cursor.execute("DELETE FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name)))
-                self.cursor.commit()
-                if self.cursor.rowcount > 0:
-                    return JSONResponse(status_code=200, content="Deleted")
+            find = self.cursor.execute("DELETE FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name)))
+            self.cursor.commit()
+            if self.cursor.rowcount > 0:
+                return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
             else:
-                return JSONResponse(status_code=500, content="Delete failed")
+                return JSONResponse(status_code=500, content={"result": "Xoá không thành công"})
 
         @self.app.post("/")
         async def upload(request: Request, file: UploadFile = File (...)):
@@ -95,7 +91,7 @@ class API:
                 self.connection_db.commit()
             except Exception:
                 pass
-            return self.templates.TemplateResponse('index.html', context={'request': request, 'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ?", (str(username),))]})
+            return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ?", (str(username),))]})
 
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
