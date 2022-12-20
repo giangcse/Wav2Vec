@@ -7,7 +7,7 @@
 
     <!-- Bootstrap CSS -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.0.2/dist/css/bootstrap.min.css" rel="stylesheet" integrity="sha384-EVSTQN3/azprG1Anm3QDgpJLIm9Nao0Yz1ztcQTwFspd3yD65VohhpuuCOmLASjC" crossorigin="anonymous">
-
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.2/jquery.min.js" integrity="sha512-tWHlutFnuG0C6nQRlpvrEhE4QpkG1nn2MOUMWmUeRePl4e3Aki0VB6W1v3oLjFtd0hVOtRQ9PHpSfN6u6/QXkQ==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
     <title>Speech to Text</title>
   </head>
   <body>
@@ -41,22 +41,38 @@
                                 <label for="file" class="form-label">Chọn file mp3/wav</label>
                                 <input class="form-control" type="file" id="file" name="file" accept=".wav, .mp3" placeholder="Chọn file mp3 hoặc wav">
                             </div>
-                            <button type="submit" class="btn btn-outline-success col-md-3 offset-md-9">Bắt đầu</button>
+                            <button type="submit" class="btn btn-outline-success col-md-3 offset-md-9">Upload</button>
                         </form>
-                        {% if result %}
+                        <br>
+                        <form onsubmit="sendMessage(event)">
                           <div class="mb-3">
-                            <label for="Greedy" class="form-label">Greedy</label>
-                            <textarea class="form-control" id="Greedy" rows="7">
-                              {{- result.greedy -}}
-                            </textarea>
+                            <select class="form-select" aria-label="Default select example"  id="audio_name">
+                              {%- for i in audios -%}
+                              <option value="{{-i-}}">{{-i-}}</option>
+                              {%- endfor -%}
+                            </select>
                           </div>
-                          <div class="mb-3">
-                            <label for="Beam" class="form-label">Beam</label>
-                            <textarea class="form-control" id="Beam" rows="7">
-                              {{- result.beam -}}
-                            </textarea>
-                          </div>
-                        {% endif %}
+                          <button type="submit" class="btn btn-outline-success col-md-3 offset-md-9">Bắt đầu</button>
+                        </form>
+                        <div class="mb-3">
+                          <label for="result" class="form-label">Kết quả</label>
+                          <textarea class="form-control" id="result" rows="7">
+                          </textarea>
+                        </div>
+                          <script>
+                            var ws = new WebSocket("ws://10.91.13.57:9090/ws");
+                            let text = '';
+                            ws.onmessage = function(event) {
+                                text += event.data + ' ';
+                                document.getElementById('result').value = text;
+                            };
+                            function sendMessage(event) {
+                                text = '';
+                                let audio = $("#audio_name").val();
+                                ws.send(audio)
+                                event.preventDefault()
+                            }
+                        </script>
                     </div>
                   </div>
             </div>
