@@ -7,3 +7,4 @@ transformers==4.9.2
 fastapi
 python-multipart
 uvicorn
+websockets
