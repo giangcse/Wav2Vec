@@ -15,3 +15,6 @@ Sử dụng model Wav2Vec để chuyển giọng nói thành văn bản. Ứng d
 |----------------|-------------------------------|-----------------------------|
 |abc.wav         |`91%`				             |87%                          |
 |def.mp3         |`95%`            				 |86%				           |
+
+## Hướng dẫn cài đặt
+`sudo setup.sh`

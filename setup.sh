@@ -15,7 +15,6 @@ fi
 python3.7 -m venv s2t
 source s2t/bin/activate
 pip install -U pip
-cd Wav2Vec
 pip3 install -r requirements.txt
 pip3 install torch torchvision torchaudio
 pip3 install kenlm-master.zip
