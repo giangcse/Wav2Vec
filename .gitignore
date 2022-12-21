@@ -1,2 +1,7 @@
 cache/
 __pycache__/
+__pycache__/api.cpython-37.pyc
+pretrained_models/sepformer-wham16k-enhancement/decoder.ckpt
+pretrained_models/sepformer-wham16k-enhancement/encoder.ckpt
+pretrained_models/sepformer-wham16k-enhancement/masknet.ckpt
+pretrained_models/sepformer-wham16k-enhancement/hyperparams.yaml

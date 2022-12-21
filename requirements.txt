@@ -8,3 +8,5 @@ fastapi
 python-multipart
 uvicorn
 websockets
+pydub
+speechbrain
