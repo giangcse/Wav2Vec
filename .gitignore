@@ -7,3 +7,5 @@ pretrained_models/sepformer-wham16k-enhancement/decoder.ckpt
 pretrained_models/sepformer-wham16k-enhancement/encoder.ckpt
 pretrained_models/sepformer-wham16k-enhancement/masknet.ckpt
 pretrained_models/sepformer-wham16k-enhancement/hyperparams.yaml
+models/wav2vec2-large-vi
+models/wav2vec2-large-vi
