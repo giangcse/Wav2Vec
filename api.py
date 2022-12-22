@@ -152,6 +152,14 @@ class API:
         @self.app.get("/")
         async def root(request: Request):
             return self.templates.TemplateResponse('index.html', context={'request': request})
+            # Endpoint get list audio
+        @self.app.post("/get_list")
+        async def get_list(request: Request, username: str = Form(...)):
+            find = self.cursor.execute("SELECT * FROM audios WHERE USERNAME = ?", (str(username), ))
+            audios = []
+            for i in find.fetchall():
+                audios.append(i[0])
+            return audios
         # Endpoint xoá audio
         @self.app.post("/delete")
         async def delete(request: Request, body: Delete_audio):
