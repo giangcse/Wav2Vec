@@ -17,5 +17,5 @@ python3.7 -m venv s2t
 source s2t/bin/activate
 pip install -U pip
 pip3 install -r requirements.txt
-pip3 install torch torchvision torchaudio
+pip3 install torch torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
 pip3 install kenlm-master.zip
