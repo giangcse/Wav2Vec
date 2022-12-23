@@ -164,7 +164,6 @@ class API:
                 chunk_len = chunk_duration*sample_rate
                 input_padding_len = int(padding_duration*sample_rate)
                 output_padding_len = self.BVM.model._get_feat_extract_output_lengths(input_padding_len)
-
                 # Ghi file log
                 log_file =  open((data['audio'])[:-4] + '_250H.txt', 'a', encoding='utf8')
                 sec = 0
@@ -177,10 +176,10 @@ class API:
 
                     if data['keyframe']==1:
                         return_data = {"time": str(datetime.timedelta(seconds=sec)), "text": text}
-                        await websocket.send_text(f"{return_data}")
+                        await websocket.send_text(str(return_data))
                         log_file.write("{:>12} {}\n".format(str(datetime.timedelta(seconds=sec)), text))
                     else:
-                        await websocket.send_text(f"{text}")
+                        await websocket.send_text(str(data))
                         log_file.write(text + " ")
                     sec += chunk_duration
                 log_file.close()
