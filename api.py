@@ -14,6 +14,7 @@ import kenlm
 import librosa
 import numpy as np
 import sqlite3
+import datetime
 
 from fastapi import FastAPI, Form, File, UploadFile, WebSocket
 from fastapi.requests import Request
@@ -21,6 +22,7 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.templating import Jinja2Templates
 from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 from pydantic import BaseModel
 from typing import Union
 
@@ -39,6 +41,8 @@ class Delete_audio(BaseModel):
     username: str
     audio_name: str
 
+class Get_audio(BaseModel):
+    username: str
 class BaseVietnamese_Model:
     def __init__(self) -> None:
         # Khoi tao model
@@ -87,7 +91,8 @@ class BaseVietnamese_Model:
         # decode ctc output
         pred_ids = torch.argmax(logits, dim=-1)
         beam_search_output = self.ngram_lm_model.decode(logits.cpu().detach().numpy(), beam_width=500)
-        return beam_search_output
+        greedy_search_output = self.processor.decode(pred_ids)
+        return {"LM": beam_search_output, "notLM": greedy_search_output}
 
     def split_audio_on_silence(self, audio_path):
         #reading from audio mp3 file
@@ -152,18 +157,18 @@ class API:
         @self.app.get("/")
         async def root(request: Request):
             return self.templates.TemplateResponse('index.html', context={'request': request})
-            # Endpoint get list audio
+        # Endpoint get list audio
         @self.app.post("/get_list")
-        async def get_list(request: Request, username: str = Form(...)):
-            find = self.cursor.execute("SELECT * FROM audios WHERE USERNAME = ?", (str(username), ))
+        async def get_list(request: Request, getAudio: Get_audio):
+            find = self.cursor.execute("SELECT * FROM audios WHERE USERNAME = ?", (str(getAudio.username), ))
             audios = []
             for i in find.fetchall():
                 audios.append(i[0])
-            return audios
+            return JSONResponse(status_code=200, content={"data": audios})
         # Endpoint xoá audio
         @self.app.post("/delete")
         async def delete(request: Request, body: Delete_audio):
-            find = self.cursor.execute("DELETE FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name)))
+            deleted = self.cursor.execute("DELETE FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name), ))
             self.cursor.commit()
             if self.cursor.rowcount > 0:
                 return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
@@ -173,24 +178,33 @@ class API:
         @self.app.post("/")
         async def upload(request: Request, file: UploadFile = File (...)):
             username = self.cursor.execute('SELECT USERNAME FROM users WHERE USERNAME = ?', ('admin', )).fetchone()[0]
-            if not os.path.exists(os.path.join('static', username)):
-                os.mkdir(os.path.join('static', username))
-            with open(os.path.join('static', username, file.filename), 'wb') as audio:
+            if not os.path.exists(os.path.join('audio', username)):
+                os.mkdir(os.path.join('audio', username))
+            with open(os.path.join('audio', username, file.filename), 'wb') as audio:
                 shutil.copyfileobj(file.file, audio)
             try:    
-                storage = self.cursor.execute("INSERT INTO audios(AUDIO_NAME, USERNAME) VALUES (?, ?)", (str(os.path.join('static', username, file.filename)), str(username)))
+                storage = self.cursor.execute("INSERT INTO audios(AUDIO_NAME, USERNAME, DATETIME) VALUES (?, ?, ?)", (str(os.path.join('audio', username, file.filename)), str(username), datetime.datetime.now().strftime("YYYY-MM-DD hh:mm:ss.xxxxxx")))
                 self.connection_db.commit()
             except Exception:
                 pass
             return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ?", (str(username),))]})
+        # Endpoint allow to download audio
+        @self.app.post("/download_audio")
+        async def download_audio(request: Request, audio: Delete_audio):
+            return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
 
+        # Endpoint allow to download result
+        @self.app.post("/download_text")
+        async def download_text(request: Request, audio: Delete_audio):
+            name = str(audio.audio_name)[:-4].split('/')[-1]
+            return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
         # endpoint websocket
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
             await websocket.accept()
-            with open('config.json', encoding='utf8') as f:
-                config = json.loads(f.read())
             while True:
+                with open('config.json', encoding='utf8') as f:
+                    config = json.loads(f.read())
                 data = await websocket.receive_text()
                 data = json.loads(data)
                 if (int(data['denoise'])==0):
@@ -206,8 +220,25 @@ class API:
                 input_padding_len = int(padding_duration*sample_rate)
                 output_padding_len = self.BVM.model._get_feat_extract_output_lengths(input_padding_len)
 
+                # Ghi file log
+                log_file =  open((data['audio'])[:-4] + '.txt', 'a', encoding='utf8')
+                sec = 0
                 for start in range(input_padding_len, len(y_mono)-input_padding_len, chunk_len):
-                    await websocket.send_text(f"{self.BVM.wav2vec(y_mono, start, input_padding_len, chunk_len)}")
+                    result = self.BVM.wav2vec(y_mono, start, input_padding_len, chunk_len)
+                    if data['LM']==1:
+                        text = result['LM']
+                    else:
+                        text = result['notLM']
+
+                    if data['keyframe']==1:
+                        return_data = {"time": str(datetime.timedelta(seconds=sec)), "text": text}
+                        await websocket.send_text(f"{return_data}")
+                        log_file.write("{:>12} {}\n".format(str(datetime.timedelta(seconds=sec)), text))
+                    else:
+                        await websocket.send_text(f"{text}")
+                        log_file.write(text + " ")
+                    sec += chunk_duration
+                log_file.close()
   
 
 api = API()

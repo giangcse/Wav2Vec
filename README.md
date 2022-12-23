@@ -1,20 +1,19 @@
 # Công cụ chuyển giọng nói thành văn bản (Speech2Text)
 
-Cài đặt trên ubuntu 20.04 LTS, môi trường Anaconda Python 3.7
-Cài thêm ffmpeg để cắt audio: sudo apt install -y ffmpeg
+Cài đặt trên ubuntu 20.04 LTS, python 3.7
 Sử dụng model Wav2Vec để chuyển giọng nói thành văn bản. Ứng dụng trong cuộc họp.
 
-> **Khuyến nghị:** Sử dụng  **Ubuntu 20.04** và tạo môi trường ảo với **Anaconda**.
+> **Khuyến nghị:** Sử dụng  **Ubuntu 20.04**.
 
 
 ## Đánh giá
 
 Đánh giá mô hình:
 
-|                |With  ngrams                   |With out ngrams              |
+|Model           |With  ngrams                   |With out ngrams              |
 |----------------|-------------------------------|-----------------------------|
-|abc.wav         |`91%`				             |87%                          |
-|def.mp3         |`95%`            				 |86%				           |
+|wav2vec2-large-vi-vlsp2020         |`95%`				             |87%                          |
+|wav2vec2-base-vietnamese-250h        |`91%`            				 |86%				           |
 
 ## Hướng dẫn cài đặt
 `sudo setup.sh`
