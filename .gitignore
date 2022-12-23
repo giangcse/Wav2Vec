@@ -8,3 +8,5 @@ pretrained_models/sepformer-wham16k-enhancement/hyperparams.yaml
 stt/
 large/
 audio/admin
+models/
+models/wav2vec2-large-vi-vlsp2020
