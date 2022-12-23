@@ -37,12 +37,7 @@ from pydub.silence import split_on_silence
 from speechbrain.pretrained import SepformerSeparation as separator
 import torchaudio
 
-class Delete_audio(BaseModel):
-    username: str
-    audio_name: str
 
-class Get_audio(BaseModel):
-    username: str
 class BaseVietnamese_Model:
     def __init__(self) -> None:
         # Khoi tao model
@@ -103,20 +98,21 @@ class BaseVietnamese_Model:
 
         # Create new folder with name of audio
         head, tail = os.path.split(audio_path)
-        if not os.path.exists(os.path.join('static', tail.split('.')[0])):
-            os.mkdir(os.path.join('static', tail.split('.')[0]))
+        if not os.path.exists(os.path.join('audio', tail.split('.')[0])):
+            os.mkdir(os.path.join('audio', tail.split('.')[0]))
         
         list_of_dir = []
         #loop is used to iterate over the output list
         for i, chunk in enumerate(audio_chunks):
             output_file = "chunk{0}.mp3".format(i)
-            chunk.export(os.path.join('static', tail.split('.')[0], output_file), format="mp3")
-            list_of_dir.append(os.path.join('static', tail.split('.')[0], output_file))
+            chunk.export(os.path.join('audio', tail.split('.')[0], output_file), format="mp3")
+            list_of_dir.append(os.path.join('audio', tail.split('.')[0], output_file))
         return list_of_dir
 
 class DenoiseAudio:
     def __init__(self) -> None:
         self.model = separator.from_hparams(source="speechbrain/sepformer-wham16k-enhancement", savedir='models/sepformer-wham16k-enhancement')
+        print('[INFO]\t{}'.format('Denoise model has been loaded'))
 
     def denoise(self, audio_path):
         if(os.path.exists(audio_path)):
@@ -131,15 +127,8 @@ class DenoiseAudio:
 
 class API:
     def __init__(self) -> None:
-        # Khởi tạo thông tin kết nối đến Database
-        self.database = 'database.db'
-        self.connection_db = sqlite3.connect(self.database, check_same_thread=False)
-        self.cursor = self.connection_db.cursor()
-        print('[INFO]\t{}'.format('Connected to database'))
         # API Initial
         self.app = FastAPI()
-        self.app.mount("/static", StaticFiles(directory="static"), name="static")
-        self.templates = Jinja2Templates(directory="templates/")
         self.app.add_middleware(
             CORSMiddleware,
             allow_origins=['*'],
@@ -154,50 +143,6 @@ class API:
         # Model denoise
         self.DA = DenoiseAudio()
 
-        @self.app.get("/")
-        async def root(request: Request):
-            return self.templates.TemplateResponse('index.html', context={'request': request})
-        # Endpoint get list audio
-        @self.app.post("/get_list")
-        async def get_list(request: Request, getAudio: Get_audio):
-            find = self.cursor.execute("SELECT * FROM audios WHERE USERNAME = ?", (str(getAudio.username), ))
-            audios = []
-            for i in find.fetchall():
-                audios.append(i[0])
-            return JSONResponse(status_code=200, content={"data": audios})
-        # Endpoint xoá audio
-        @self.app.post("/delete")
-        async def delete(request: Request, body: Delete_audio):
-            deleted = self.cursor.execute("DELETE FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name), ))
-            self.cursor.commit()
-            if self.cursor.rowcount > 0:
-                return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
-            else:
-                return JSONResponse(status_code=500, content={"result": "Xoá không thành công"})
-        # Enpoint upload audio
-        @self.app.post("/")
-        async def upload(request: Request, file: UploadFile = File (...)):
-            username = self.cursor.execute('SELECT USERNAME FROM users WHERE USERNAME = ?', ('admin', )).fetchone()[0]
-            if not os.path.exists(os.path.join('audio', username)):
-                os.mkdir(os.path.join('audio', username))
-            with open(os.path.join('audio', username, file.filename), 'wb') as audio:
-                shutil.copyfileobj(file.file, audio)
-            try:    
-                storage = self.cursor.execute("INSERT INTO audios(AUDIO_NAME, USERNAME, DATETIME) VALUES (?, ?, ?)", (str(os.path.join('audio', username, file.filename)), str(username), datetime.datetime.now().strftime("YYYY-MM-DD hh:mm:ss.xxxxxx")))
-                self.connection_db.commit()
-            except Exception:
-                pass
-            return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ?", (str(username),))]})
-        # Endpoint allow to download audio
-        @self.app.post("/download_audio")
-        async def download_audio(request: Request, audio: Delete_audio):
-            return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
-
-        # Endpoint allow to download result
-        @self.app.post("/download_text")
-        async def download_text(request: Request, audio: Delete_audio):
-            name = str(audio.audio_name)[:-4].split('/')[-1]
-            return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
         # endpoint websocket
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
@@ -221,7 +166,7 @@ class API:
                 output_padding_len = self.BVM.model._get_feat_extract_output_lengths(input_padding_len)
 
                 # Ghi file log
-                log_file =  open((data['audio'])[:-4] + '.txt', 'a', encoding='utf8')
+                log_file =  open((data['audio'])[:-4] + '_250H.txt', 'a', encoding='utf8')
                 sec = 0
                 for start in range(input_padding_len, len(y_mono)-input_padding_len, chunk_len):
                     result = self.BVM.wav2vec(y_mono, start, input_padding_len, chunk_len)
@@ -244,4 +189,4 @@ class API:
 api = API()
 
 if __name__=='__main__':
-    uvicorn.run('api:api.app', host='0.0.0.0', port=9090, reload=True)
+    uvicorn.run('250h:api.app', port=9090, reload=True)
