@@ -13,7 +13,8 @@ from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
 
 sys.path.insert(1,os.path.abspath('py37/pyctcdecode1'))
-from pyctcdecode import Alphabet, BeamSearchDecoderCTC, LanguageModel
+# from pyctcdecode import Alphabet, BeamSearchDecoderCTC, LanguageModel
+from py37.pyctcdecode1.pyctcdecode import Alphabet, BeamSearchDecoderCTC, LanguageModel
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 
 from speechbrain.pretrained import SepformerSeparation as separator

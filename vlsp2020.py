@@ -94,6 +94,7 @@ class API:
                 # Ghi file log
                 log_file =  open((data['audio'])[:-4] + '_VLSP2020.txt', 'a', encoding='utf8')
                 sec = 0
+                return_data = None
                 while samples_wrote < samples_total:
                     #check if the buffer is not exceeding total samples 
                     if buffer > (samples_total - samples_wrote):
@@ -113,8 +114,9 @@ class API:
                         await websocket.send_text(f"{return_data}")
                         log_file.write("{:>12} {}\n".format(str(datetime.timedelta(seconds=sec)), text))
                     else:
-                        await websocket.send_text(f"{text}")
-                        log_file.write(text + " ")
+                        return_data = text
+                        await websocket.send_text(f"{return_data}")
+                        log_file.write(return_data + " ")
                     sec += chunk_duration
                 log_file.close()
   
@@ -122,4 +124,4 @@ class API:
 api = API()
 
 if __name__=='__main__':
-    uvicorn.run('vlsp2020:api.app', host="0.0.0.0", port=9091, reload=True)
+    uvicorn.run('vlsp2020:api.app', host="0.0.0.0", port=9091)

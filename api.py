@@ -5,6 +5,8 @@ import uvicorn
 import shutil
 import sqlite3
 import datetime
+import websockets
+import asyncio
 
 from fastapi import FastAPI, Form, File, UploadFile, WebSocket
 from fastapi.requests import Request
@@ -12,6 +14,9 @@ from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
 from pydantic import BaseModel
+
+from vietnamesemodel import BaseVietnamese_Model
+from vlsp2020 import LargeVLSP_Model
 
 class Delete_audio(BaseModel):
     username: str
@@ -89,10 +94,9 @@ class API:
             await websocket.accept()
             while True:
                 data = await websocket.receive_text()
-                # data = json.loads(data)
-                async with websockets.connect("ws://localhost:9090/ws") as wst:
-                    await wst.send(str(data))
-                    await websocket.send_text(wst.recv())
+                data = json.loads(data)
+                await websocket.send_text(data)
+
 
 
 api = API()
