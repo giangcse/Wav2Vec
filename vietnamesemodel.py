@@ -70,6 +70,43 @@ class BaseVietnamese_Model:
         greedy_search_output = self.processor.decode(pred_ids)
         return {"LM": beam_search_output, "notLM": greedy_search_output}
 
+    def speech_to_text(self, data):
+        with open('config.json', encoding='utf8') as f:
+            config = json.loads(f.read())
+        # data = json.loads(data)
+        if (int(data['denoise'])==0):
+            y, sr = librosa.load(data['audio'], mono=False, sr=16000)
+            y_mono = librosa.to_mono(y)
+        else:
+            y_mono = self.DA.denoise(data['audio'])
+        chunk_duration = config['chunk_duration'] # sec
+        padding_duration = config['padding_duration'] # sec
+        sample_rate = config['sample_rate']
+
+        chunk_len = chunk_duration*sample_rate
+        input_padding_len = int(padding_duration*sample_rate)
+        output_padding_len = self.model._get_feat_extract_output_lengths(input_padding_len)
+        # Ghi file log
+        log_file =  open((data['audio'])[:-4] + '_250H.txt', 'a', encoding='utf8')
+        sec = 0
+        return_data = None
+        for start in range(input_padding_len, len(y_mono)-input_padding_len, chunk_len):
+            result = self.wav2vec(y_mono, start, input_padding_len, chunk_len)
+            if data['LM']==1:
+                text = result['LM']
+            else:
+                text = result['notLM']
+
+            if data['keyframe']==1:
+                return_data = {"time": str(datetime.timedelta(seconds=sec)), "text": text}
+                log_file.write("{:>12} {}\n".format(str(datetime.timedelta(seconds=sec)), text))
+            else:
+                return_data = text
+                log_file.write(text + " ")
+            sec += chunk_duration
+            yield return_data
+        log_file.close()
+
 class DenoiseAudio:
     def __init__(self) -> None:
         self.model = separator.from_hparams(source="speechbrain/sepformer-wham16k-enhancement", savedir='models/sepformer-wham16k-enhancement')
@@ -84,70 +121,3 @@ class DenoiseAudio:
             except Exception:
                 return Exception
 
-
-class API:
-    def __init__(self) -> None:
-        # API Initial
-        self.app = FastAPI()
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=['*'],
-            allow_credentials=True,
-            allow_methods=['*'],
-            allow_headers=['*']
-        )
-        print('[INFO]\t{}'.format('API initial'))
-
-        # Model speech to text
-        self.BVM = BaseVietnamese_Model()
-        # Model denoise
-        self.DA = DenoiseAudio()
-
-        # endpoint websocket
-        @self.app.websocket("/ws")
-        async def websocket_endpoint(websocket: WebSocket):
-            await websocket.accept()
-            while True:
-                with open('config.json', encoding='utf8') as f:
-                    config = json.loads(f.read())
-                data = await websocket.receive_text()
-                data = json.loads(data)
-                if (int(data['denoise'])==0):
-                    y, sr = librosa.load(data['audio'], mono=False, sr=16000)
-                    y_mono = librosa.to_mono(y)
-                else:
-                    y_mono = self.DA.denoise(data['audio'])
-                chunk_duration = config['chunk_duration'] # sec
-                padding_duration = config['padding_duration'] # sec
-                sample_rate = config['sample_rate']
-
-                chunk_len = chunk_duration*sample_rate
-                input_padding_len = int(padding_duration*sample_rate)
-                output_padding_len = self.BVM.model._get_feat_extract_output_lengths(input_padding_len)
-                # Ghi file log
-                log_file =  open((data['audio'])[:-4] + '_250H.txt', 'a', encoding='utf8')
-                sec = 0
-                return_data = None
-                for start in range(input_padding_len, len(y_mono)-input_padding_len, chunk_len):
-                    result = self.BVM.wav2vec(y_mono, start, input_padding_len, chunk_len)
-                    if data['LM']==1:
-                        text = result['LM']
-                    else:
-                        text = result['notLM']
-
-                    if data['keyframe']==1:
-                        return_data = {"time": str(datetime.timedelta(seconds=sec)), "text": text}
-                        await websocket.send_text((return_data))
-                        log_file.write("{:>12} {}\n".format(str(datetime.timedelta(seconds=sec)), text))
-                    else:
-                        return_data = text
-                        await websocket.send_text(return_data)
-                        log_file.write(text + " ")
-                    sec += chunk_duration
-                log_file.close()
-  
-
-api = API()
-
-if __name__=='__main__':
-    uvicorn.run('vietnamesemodel:api.app', host="0.0.0.0", port=9090, reload=True)

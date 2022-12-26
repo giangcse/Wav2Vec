@@ -10,10 +10,7 @@ import librosa
 import numpy as np
 import datetime
 
-from fastapi import FastAPI, Form, File, UploadFile, WebSocket
-from fastapi.requests import Request
-from fastapi.responses import JSONResponse
-from fastapi.middleware.cors import CORSMiddleware
+
 from importlib.machinery import SourceFileLoader
 from transformers import Wav2Vec2ProcessorWithLM
 
@@ -35,6 +32,51 @@ class LargeVLSP_Model:
         wLM = self.processor.decode(output.logits.cpu().detach().numpy()[0], beam_width=100).text
         return {"LM": wLM, "notLM": woLM}
 
+    def speech_to_text(self, data):
+        with open('config.json', encoding='utf8') as f:
+            config = json.loads(f.read())
+        # data = json.loads(data)
+        if (int(data['denoise'])==0):
+            y, sr = librosa.load(data['audio'], mono=False, sr=16000)
+            y_mono = librosa.to_mono(y)
+        else:
+            y_mono = self.DA.denoise(data['audio'])
+        chunk_duration = config['chunk_duration'] # sec
+        padding_duration = config['padding_duration'] # sec
+        sample_rate = config['sample_rate']
+
+        buffer = chunk_duration * 16000
+        samples_total = len(y_mono)
+        samples_wrote = 0
+
+        # Ghi file log
+        log_file =  open((data['audio'])[:-4] + '_VLSP2020.txt', 'a', encoding='utf8')
+        sec = 0
+        return_data = None
+        while samples_wrote < samples_total:
+            #check if the buffer is not exceeding total samples 
+            if buffer > (samples_total - samples_wrote):
+                buffer = samples_total - samples_wrote
+
+            block = y_mono[samples_wrote : (samples_wrote + buffer)]
+            samples_wrote += buffer
+
+            result = self.load(block)
+            if data['LM']==1:
+                text = result['LM']
+            else:
+                text = result['notLM']
+
+            if data['keyframe']==1:
+                return_data = {"time": str(datetime.timedelta(seconds=sec)), "text": text}
+                log_file.write("{:>12} {}\n".format(str(datetime.timedelta(seconds=sec)), text))
+            else:
+                return_data = text
+                log_file.write(return_data + " ")
+            sec += chunk_duration
+            yield return_data
+        log_file.close()
+
 class DenoiseAudio:
     def __init__(self) -> None:
         self.model = separator.from_hparams(source="speechbrain/sepformer-wham16k-enhancement", savedir='models/sepformer-wham16k-enhancement')
@@ -50,78 +92,3 @@ class DenoiseAudio:
             except Exception:
                 return Exception
 
-
-class API:
-    def __init__(self) -> None:
-        # API Initial
-        self.app = FastAPI()
-        self.app.add_middleware(
-            CORSMiddleware,
-            allow_origins=['*'],
-            allow_credentials=True,
-            allow_methods=['*'],
-            allow_headers=['*']
-        )
-        print('[INFO]\t{}'.format('API initial'))
-
-        # Model speech to text
-        self.LVM = LargeVLSP_Model()
-        # Model denoise
-        self.DA = DenoiseAudio()
-
-        # endpoint websocket
-        @self.app.websocket("/ws")
-        async def websocket_endpoint(websocket: WebSocket):
-            await websocket.accept()
-            while True:
-                with open('config.json', encoding='utf8') as f:
-                    config = json.loads(f.read())
-                data = await websocket.receive_text()
-                data = json.loads(data)
-                if (int(data['denoise'])==0):
-                    y, sr = librosa.load(data['audio'], mono=False, sr=16000)
-                    y_mono = librosa.to_mono(y)
-                else:
-                    y_mono = self.DA.denoise(data['audio'])
-                chunk_duration = config['chunk_duration'] # sec
-                padding_duration = config['padding_duration'] # sec
-                sample_rate = config['sample_rate']
-
-                buffer = chunk_duration * 16000
-                samples_total = len(y_mono)
-                samples_wrote = 0
-
-                # Ghi file log
-                log_file =  open((data['audio'])[:-4] + '_VLSP2020.txt', 'a', encoding='utf8')
-                sec = 0
-                return_data = None
-                while samples_wrote < samples_total:
-                    #check if the buffer is not exceeding total samples 
-                    if buffer > (samples_total - samples_wrote):
-                        buffer = samples_total - samples_wrote
-
-                    block = y_mono[samples_wrote : (samples_wrote + buffer)]
-                    samples_wrote += buffer
-
-                    result = self.LVM.load(block)
-                    if data['LM']==1:
-                        text = result['LM']
-                    else:
-                        text = result['notLM']
-
-                    if data['keyframe']==1:
-                        return_data = {"time": str(datetime.timedelta(seconds=sec)), "text": text}
-                        await websocket.send_text(f"{return_data}")
-                        log_file.write("{:>12} {}\n".format(str(datetime.timedelta(seconds=sec)), text))
-                    else:
-                        return_data = text
-                        await websocket.send_text(f"{return_data}")
-                        log_file.write(return_data + " ")
-                    sec += chunk_duration
-                log_file.close()
-  
-
-api = API()
-
-if __name__=='__main__':
-    uvicorn.run('vlsp2020:api.app', host="0.0.0.0", port=9091)

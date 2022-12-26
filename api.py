@@ -42,6 +42,10 @@ class API:
             allow_headers=['*']
         )
         print('[INFO]\t{}'.format('API initial'))
+        
+        self.BVM = BaseVietnamese_Model()
+        
+        self.VLSP = LargeVLSP_Model()
 
         @self.app.get("/")
         async def root(request: Request):
@@ -95,7 +99,26 @@ class API:
             while True:
                 data = await websocket.receive_text()
                 data = json.loads(data)
-                await websocket.send_text(data)
+                return_list_1 = []
+                return_list_2 = []
+                return_data = []
+                if(data['model']=='vlsp'):
+                    return_data = self.VLSP.speech_to_text(data)
+                    for i in return_data:
+                        return_list_1.append([str(i)])
+                elif(data['model']=='250h'):
+                    return_data = self.BVM.speech_to_text(data)
+                    for i in return_data:
+                        return_list_2.append([str(i)])
+                else:
+                    for i in self.VLSP.speech_to_text(data):
+                        return_list_1.append([str(i)])
+                    for j in self.BVM.speech_to_text(data):
+                        return_list_2.append([str(j)])
+
+                return_data.append(return_list_1)
+                return_data.append(return_list_2)
+                await websocket.send_text(str(return_data))
 
 
 
