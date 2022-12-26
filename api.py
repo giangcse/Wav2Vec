@@ -5,18 +5,13 @@ import uvicorn
 import shutil
 import sqlite3
 import datetime
-import asyncio
-import websockets
 
 from fastapi import FastAPI, Form, File, UploadFile, WebSocket
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
 from starlette.responses import FileResponse
 from pydantic import BaseModel
-from typing import Union
 
 class Delete_audio(BaseModel):
     username: str
@@ -76,7 +71,7 @@ class API:
                 self.connection_db.commit()
             except Exception:
                 pass
-            return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ?", (str(username),))]})
+            return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERwebsocketsE USERNAME = ?", (str(username),))]})
         # Endpoint allow to download audio
         @self.app.post("/download_audio")
         async def download_audio(request: Request, audio: Delete_audio):

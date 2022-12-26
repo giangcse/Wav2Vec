@@ -1,9 +1,4 @@
 # -*- coding: utf-8 -*-
-#####################################################################################
-#   File API gồm các class chứa các Model Speech to text và model khử noise audio   #
-#   Cùng với class API chứa các API endpoint để tương tác với hệ thống              #
-#                                                                                   #
-#####################################################################################
 import json
 import os, zipfile
 import uvicorn
@@ -13,29 +8,17 @@ import torch
 import kenlm
 import librosa
 import numpy as np
-import sqlite3
 import datetime
 
 from fastapi import FastAPI, Form, File, UploadFile, WebSocket
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from starlette.responses import FileResponse
-from pydantic import BaseModel
-from typing import Union
-
-from datasets import load_dataset
-from transformers.file_utils import cached_path, hf_bucket_url
 from importlib.machinery import SourceFileLoader
 from transformers import Wav2Vec2ProcessorWithLM
 
-from pydub import AudioSegment
-from pydub.silence import split_on_silence
 
 from speechbrain.pretrained import SepformerSeparation as separator
-import torchaudio
 
 class LargeVLSP_Model:
     def __init__(self) -> None:
@@ -139,4 +122,4 @@ class API:
 api = API()
 
 if __name__=='__main__':
-    uvicorn.run('vlsp2020:api.app', port=9091, reload=True)
+    uvicorn.run('vlsp2020:api.app', host="0.0.0.0", port=9091, reload=True)

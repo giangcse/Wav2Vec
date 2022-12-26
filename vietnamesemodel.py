@@ -1,42 +1,22 @@
 # -*- coding: utf-8 -*-
-#####################################################################################
-#   File API gồm các class chứa các Model Speech to text và model khử noise audio   #
-#   Cùng với class API chứa các API endpoint để tương tác với hệ thống              #
-#                                                                                   #
-#####################################################################################
+
 import json
-import os, zipfile
+import os, zipfile, sys
 import uvicorn
-import shutil
-import soundfile as sf
 import torch
 import kenlm
 import librosa
 import numpy as np
-import sqlite3
 import datetime
 
-from fastapi import FastAPI, Form, File, UploadFile, WebSocket
-from fastapi.requests import Request
-from fastapi.responses import JSONResponse
+from fastapi import FastAPI, WebSocket
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
-from starlette.responses import FileResponse
-from pydantic import BaseModel
-from typing import Union
 
-from datasets import load_dataset
+sys.path.insert(1,os.path.abspath('py37/pyctcdecode1'))
 from pyctcdecode import Alphabet, BeamSearchDecoderCTC, LanguageModel
-from transformers.file_utils import cached_path, hf_bucket_url
 from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
 
-from pydub import AudioSegment
-from pydub.silence import split_on_silence
-
 from speechbrain.pretrained import SepformerSeparation as separator
-import torchaudio
-
 
 class BaseVietnamese_Model:
     def __init__(self) -> None:
@@ -89,26 +69,6 @@ class BaseVietnamese_Model:
         greedy_search_output = self.processor.decode(pred_ids)
         return {"LM": beam_search_output, "notLM": greedy_search_output}
 
-    def split_audio_on_silence(self, audio_path):
-        #reading from audio mp3 file
-        sound = AudioSegment.from_mp3(audio_path)
-
-        # spliting audio files
-        audio_chunks = split_on_silence(sound, min_silence_len=500, silence_thresh=-40 )
-
-        # Create new folder with name of audio
-        head, tail = os.path.split(audio_path)
-        if not os.path.exists(os.path.join('audio', tail.split('.')[0])):
-            os.mkdir(os.path.join('audio', tail.split('.')[0]))
-        
-        list_of_dir = []
-        #loop is used to iterate over the output list
-        for i, chunk in enumerate(audio_chunks):
-            output_file = "chunk{0}.mp3".format(i)
-            chunk.export(os.path.join('audio', tail.split('.')[0], output_file), format="mp3")
-            list_of_dir.append(os.path.join('audio', tail.split('.')[0], output_file))
-        return list_of_dir
-
 class DenoiseAudio:
     def __init__(self) -> None:
         self.model = separator.from_hparams(source="speechbrain/sepformer-wham16k-enhancement", savedir='models/sepformer-wham16k-enhancement')
@@ -118,7 +78,6 @@ class DenoiseAudio:
         if(os.path.exists(audio_path)):
             est_sources = self.model.separate_file(path=audio_path)
             try:
-                # torchaudio.save("fail_e.wav", est_sources[:, :, 0].detach().cpu(), 16000)
                 mono_audio = (est_sources[:, :, 0].detach().cpu())[0].numpy()
                 return mono_audio
             except Exception:
@@ -167,6 +126,7 @@ class API:
                 # Ghi file log
                 log_file =  open((data['audio'])[:-4] + '_250H.txt', 'a', encoding='utf8')
                 sec = 0
+                return_data = None
                 for start in range(input_padding_len, len(y_mono)-input_padding_len, chunk_len):
                     result = self.BVM.wav2vec(y_mono, start, input_padding_len, chunk_len)
                     if data['LM']==1:
@@ -176,10 +136,11 @@ class API:
 
                     if data['keyframe']==1:
                         return_data = {"time": str(datetime.timedelta(seconds=sec)), "text": text}
-                        await websocket.send_text(str(return_data))
+                        await websocket.send_text((return_data))
                         log_file.write("{:>12} {}\n".format(str(datetime.timedelta(seconds=sec)), text))
                     else:
-                        await websocket.send_text(str(data))
+                        return_data = text
+                        await websocket.send_text(return_data)
                         log_file.write(text + " ")
                     sec += chunk_duration
                 log_file.close()
@@ -188,4 +149,4 @@ class API:
 api = API()
 
 if __name__=='__main__':
-    uvicorn.run('250h:api.app', port=9090, reload=True)
+    uvicorn.run('vietnamesemodel:api.app', host="0.0.0.0", port=9090, reload=True)

@@ -13,9 +13,11 @@ else
     echo "Please run with sudo"
 fi
 
-python3.7 -m venv s2t
-source s2t/bin/activate
+python3.7 -m venv py37
+source py37/bin/activate
 pip install -U pip
 pip3 install -r requirements.txt
 pip3 install torch torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
 pip3 install kenlm-master.zip
+pip3 install pyctcdecode==v0.1.0 --target=/py37/pyctcdecode01
+pip3 install pyctcdecode==v0.4.0 --target=/py37/pyctcdecode04
