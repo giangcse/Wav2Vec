@@ -116,9 +116,9 @@ class API:
                         await websocket.send_text(str(i))
                 else:
                     for i in self.VLSP.speech_to_text(data):
-                        return_string_1 += (str(i))
+                        return_string_1 += (str(i)+' ')
                     for j in self.BVM.speech_to_text(data):
-                        return_string_2 += (str(j))
+                        return_string_2 += (str(j)+' ')
                     # self.show_comparison(return_string_1, return_string_2, sidebyside=False)
                     await websocket.send_text(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
 
@@ -137,11 +137,11 @@ class API:
         for match in difflib.SequenceMatcher(a=l1, b=l2).get_matching_blocks():
             if (prev.a + prev.size != match.a):
                 for i in range(prev.a + prev.size, match.a):
-                    res2 += ['_' * len(l1[i])]
+                    res2 += ['_']
                 res1 += l1[prev.a + prev.size:match.a]
             if (prev.b + prev.size != match.b):
                 for i in range(prev.b + prev.size, match.b):
-                    res1 += ['_' * len(l2[i])]
+                    res1 += ['_']
                 res2 += l2[prev.b + prev.size:match.b]
             res1 += l1[match.a:match.a+match.size]
             res2 += l2[match.b:match.b+match.size]
@@ -164,7 +164,6 @@ class API:
         return result
 
     def format_text(self,text_input, list_bias_input):
-        print(text_input)
         bias_list = list_bias_input.strip().split('\n')
         norm_result = infer([text_input], bias_list)
         return norm_result[0]
@@ -186,20 +185,24 @@ class API:
                     rgt = s2[i].ljust(width)
                     print(lft + ' | ' + rgt + ' | ')
         else:
-            sentence_1 = s1.split(' ')
-            sentence_2 = s2.split(' ')
-            return_string = ''
+            sentence_1=str(s1).split(' ')
+            sentence_2=str(s2).split(' ')
+            return_data = ''
             for i in range(len(sentence_1)):
-                if str(sentence_1[i]).lower() == str(sentence_2[i]).lower():
-                    return_string += "{} ".format(sentence_1[i])
+                if str(sentence_1[i]).lower() == 'tỷ':
+                    sentence_1[i]='tỉ'
+                if str(sentence_2[i]).lower() == 'tỷ':
+                    sentence_2[i]='tỉ'
+
+                if(sentence_1[i] == sentence_2[i]):
+                    return_data += "{} ".format(sentence_1[i])
                 else:
-                    if '_' in sentence_1[i]:
-                        return_string += '{} '.format(sentence_2[i])
-                    elif '_' in sentence_2[i]:
-                        return_string += '{} '.format(sentence_1[i])
-                    else:
-                        return_string += '[{} | {}] '.format(sentence_1[i], sentence_2[i])
-            return self.format_text(return_string,'')
+                    if('_' in sentence_1[i]):
+                        return_data += "{} ".format(sentence_2[i])
+                    elif('_' in sentence_2[i]):
+                        return_data += "{} ".format(sentence_1[i])
+                    return_data += ' '
+            return self.format_text(return_data, '')
 
 api = API()
 

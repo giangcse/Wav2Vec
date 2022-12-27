@@ -10,4 +10,4 @@ uvicorn
 websockets
 pydub
 speechbrain
-jinja2
+regtag
