@@ -5,4 +5,9 @@ pretrained_models/sepformer-wham16k-enhancement/decoder.ckpt
 pretrained_models/sepformer-wham16k-enhancement/encoder.ckpt
 pretrained_models/sepformer-wham16k-enhancement/masknet.ckpt
 pretrained_models/sepformer-wham16k-enhancement/hyperparams.yaml
-s2t/
+stt/
+large/
+audio/admin
+models/
+models/wav2vec2-large-vi-vlsp2020
+py37/

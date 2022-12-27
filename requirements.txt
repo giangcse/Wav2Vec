@@ -10,3 +10,4 @@ uvicorn
 websockets
 pydub
 speechbrain
+jinja2

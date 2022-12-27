@@ -1,128 +1,31 @@
 # -*- coding: utf-8 -*-
-#####################################################################################
-#   File API gồm các class chứa các Model Speech to text và model khử noise audio   #
-#   Cùng với class API chứa các API endpoint để tương tác với hệ thống              #
-#                                                                                   #
-#####################################################################################
 import json
 import os, zipfile
 import uvicorn
 import shutil
-import soundfile as sf
-import torch
-import kenlm
-import librosa
-import numpy as np
 import sqlite3
+import datetime
+import websockets
+import asyncio
+import difflib
+import re
 
 from fastapi import FastAPI, Form, File, UploadFile, WebSocket
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.templating import Jinja2Templates
-from fastapi.staticfiles import StaticFiles
+from starlette.responses import FileResponse
 from pydantic import BaseModel
-from typing import Union
 
-from datasets import load_dataset
-from pyctcdecode import Alphabet, BeamSearchDecoderCTC, LanguageModel
-from transformers.file_utils import cached_path, hf_bucket_url
-from transformers import Wav2Vec2Processor, Wav2Vec2ForCTC
-
-from pydub import AudioSegment
-from pydub.silence import split_on_silence
-
-from speechbrain.pretrained import SepformerSeparation as separator
-import torchaudio
+from vietnamesemodel import BaseVietnamese_Model
+from vlsp2020 import LargeVLSP_Model
 
 class Delete_audio(BaseModel):
     username: str
     audio_name: str
 
-class BaseVietnamese_Model:
-    def __init__(self) -> None:
-        # Khoi tao model
-        self.cache_dir = './cache/'
-        self.processor = Wav2Vec2Processor.from_pretrained("models/wav2vec2-base-vietnamese-250h", local_files_only=True)
-        self.model = Wav2Vec2ForCTC.from_pretrained("models/wav2vec2-base-vietnamese-250h", local_files_only=True)
-        self.lm_file = "models/wav2vec2-base-vietnamese-250h/vi_lm_4grams.bin.zip"
-        print('[INFO]\t{}'.format('Model Wav2Vec2 Base Vietnamese 250h'))
-        with zipfile.ZipFile(self.lm_file, 'r') as zip_ref:
-            zip_ref.extractall(self.cache_dir)
-        self.lm_file = self.cache_dir + 'vi_lm_4grams.bin'
-
-        self.ngram_lm_model = self.get_decoder_ngram_model(self.processor.tokenizer, self.lm_file)
-        print('[INFO]\t{}'.format('N-Grams models load completed'))
-
-    def get_decoder_ngram_model(self, tokenizer, ngram_lm_path):
-        vocab_dict = tokenizer.get_vocab()
-        sort_vocab = sorted((value, key) for (key, value) in vocab_dict.items())
-        vocab = [x[1] for x in sort_vocab][:-2]
-        vocab_list = vocab
-        # convert ctc blank character representation
-        vocab_list[tokenizer.pad_token_id] = ""
-        # replace special characters
-        vocab_list[tokenizer.unk_token_id] = ""
-        # vocab_list[tokenizer.bos_token_id] = ""
-        # vocab_list[tokenizer.eos_token_id] = ""
-        # convert space character representation
-        vocab_list[tokenizer.word_delimiter_token_id] = " "
-        # specify ctc blank char index, since conventially it is the last entry of the logit matrix
-        alphabet = Alphabet.build_alphabet(vocab_list, ctc_token_idx=tokenizer.pad_token_id)
-        lm_model = kenlm.Model(ngram_lm_path)
-        decoder = BeamSearchDecoderCTC(alphabet,
-                                    language_model=LanguageModel(lm_model))
-        return decoder
-
-    def wav2vec(self, y_mono, start, input_padding_len, chunk_len):
-        chunk = y_mono[start-input_padding_len:start+chunk_len+input_padding_len]
-        input_values = self.processor(
-            chunk, 
-            sampling_rate=16000, 
-            return_tensors="pt"
-        ).input_values
-        # ).input_values.to("cuda")
-        # model.to("cuda")
-        logits = self.model(input_values).logits[0]
-        # decode ctc output
-        pred_ids = torch.argmax(logits, dim=-1)
-        beam_search_output = self.ngram_lm_model.decode(logits.cpu().detach().numpy(), beam_width=500)
-        return beam_search_output
-
-    def split_audio_on_silence(self, audio_path):
-        #reading from audio mp3 file
-        sound = AudioSegment.from_mp3(audio_path)
-
-        # spliting audio files
-        audio_chunks = split_on_silence(sound, min_silence_len=500, silence_thresh=-40 )
-
-        # Create new folder with name of audio
-        head, tail = os.path.split(audio_path)
-        if not os.path.exists(os.path.join('static', tail.split('.')[0])):
-            os.mkdir(os.path.join('static', tail.split('.')[0]))
-        
-        list_of_dir = []
-        #loop is used to iterate over the output list
-        for i, chunk in enumerate(audio_chunks):
-            output_file = "chunk{0}.mp3".format(i)
-            chunk.export(os.path.join('static', tail.split('.')[0], output_file), format="mp3")
-            list_of_dir.append(os.path.join('static', tail.split('.')[0], output_file))
-        return list_of_dir
-
-class DenoiseAudio:
-    def __init__(self) -> None:
-        self.model = separator.from_hparams(source="speechbrain/sepformer-wham16k-enhancement", savedir='models/sepformer-wham16k-enhancement')
-
-    def denoise(self, audio_path):
-        if(os.path.exists(audio_path)):
-            est_sources = self.model.separate_file(path=audio_path)
-            try:
-                # torchaudio.save("fail_e.wav", est_sources[:, :, 0].detach().cpu(), 16000)
-                mono_audio = (est_sources[:, :, 0].detach().cpu())[0].numpy()
-                return mono_audio
-            except Exception:
-                return Exception
-
+class Get_audio(BaseModel):
+    username: str
 
 class API:
     def __init__(self) -> None:
@@ -133,8 +36,6 @@ class API:
         print('[INFO]\t{}'.format('Connected to database'))
         # API Initial
         self.app = FastAPI()
-        self.app.mount("/static", StaticFiles(directory="static"), name="static")
-        self.templates = Jinja2Templates(directory="templates/")
         self.app.add_middleware(
             CORSMiddleware,
             allow_origins=['*'],
@@ -143,27 +44,26 @@ class API:
             allow_headers=['*']
         )
         print('[INFO]\t{}'.format('API initial'))
-
-        # Model speech to text
+        
         self.BVM = BaseVietnamese_Model()
-        # Model denoise
-        self.DA = DenoiseAudio()
+        
+        self.VLSP = LargeVLSP_Model()
 
         @self.app.get("/")
         async def root(request: Request):
             return self.templates.TemplateResponse('index.html', context={'request': request})
-            # Endpoint get list audio
+        # Endpoint get list audio
         @self.app.post("/get_list")
-        async def get_list(request: Request, username: str = Form(...)):
-            find = self.cursor.execute("SELECT * FROM audios WHERE USERNAME = ?", (str(username), ))
+        async def get_list(request: Request, getAudio: Get_audio):
+            find = self.cursor.execute("SELECT * FROM audios WHERE USERNAME = ?", (str(getAudio.username), ))
             audios = []
             for i in find.fetchall():
                 audios.append(i[0])
-            return audios
+            return JSONResponse(status_code=200, content={"data": audios})
         # Endpoint xoá audio
         @self.app.post("/delete")
         async def delete(request: Request, body: Delete_audio):
-            find = self.cursor.execute("DELETE FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name)))
+            deleted = self.cursor.execute("DELETE FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name), ))
             self.cursor.commit()
             if self.cursor.rowcount > 0:
                 return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
@@ -173,44 +73,127 @@ class API:
         @self.app.post("/")
         async def upload(request: Request, file: UploadFile = File (...)):
             username = self.cursor.execute('SELECT USERNAME FROM users WHERE USERNAME = ?', ('admin', )).fetchone()[0]
-            if not os.path.exists(os.path.join('static', username)):
-                os.mkdir(os.path.join('static', username))
-            with open(os.path.join('static', username, file.filename), 'wb') as audio:
+            if not os.path.exists(os.path.join('audio', username)):
+                os.mkdir(os.path.join('audio', username))
+            with open(os.path.join('audio', username, file.filename), 'wb') as audio:
                 shutil.copyfileobj(file.file, audio)
             try:    
-                storage = self.cursor.execute("INSERT INTO audios(AUDIO_NAME, USERNAME) VALUES (?, ?)", (str(os.path.join('static', username, file.filename)), str(username)))
+                storage = self.cursor.execute("INSERT INTO audios(AUDIO_NAME, USERNAME, DATETIME) VALUES (?, ?, ?)", (str(os.path.join('audio', username, file.filename)), str(username), datetime.datetime.now().strftime("YYYY-MM-DD hh:mm:ss.xxxxxx")))
                 self.connection_db.commit()
             except Exception:
                 pass
-            return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ?", (str(username),))]})
+            return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERwebsocketsE USERNAME = ?", (str(username),))]})
+        # Endpoint allow to download audio
+        @self.app.post("/download_audio")
+        async def download_audio(request: Request, audio: Delete_audio):
+            return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
+
+        # Endpoint allow to download result
+        @self.app.post("/download_text")
+        async def download_text(request: Request, audio: Delete_audio):
+            name = str(audio.audio_name)[:-4].split('/')[-1]
+            return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
 
         # endpoint websocket
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
             await websocket.accept()
-            with open('config.json', encoding='utf8') as f:
-                config = json.loads(f.read())
             while True:
                 data = await websocket.receive_text()
                 data = json.loads(data)
-                if (int(data['denoise'])==0):
-                    y, sr = librosa.load(data['audio'], mono=False, sr=16000)
-                    y_mono = librosa.to_mono(y)
+                return_string_1 = ''
+                return_string_2 = ''
+                return_data = None
+                if(data['model']=='vlsp'):
+                    return_data = self.VLSP.speech_to_text(data)
+                    for i in return_data:
+                        await websocket.send_text(str(i))
+                elif(data['model']=='250h'):
+                    return_data = self.BVM.speech_to_text(data)
+                    for i in return_data:
+                        await websocket.send_text(str(i))
                 else:
-                    y_mono = self.DA.denoise(data['audio'])
-                chunk_duration = config['chunk_duration'] # sec
-                padding_duration = config['padding_duration'] # sec
-                sample_rate = config['sample_rate']
+                    for i in self.VLSP.speech_to_text(data):
+                        return_string_1 += (str(i))
+                    for j in self.BVM.speech_to_text(data):
+                        return_string_2 += (str(j))
+                    # self.show_comparison(return_string_1, return_string_2, sidebyside=False)
+                    await websocket.send_text(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
 
-                chunk_len = chunk_duration*sample_rate
-                input_padding_len = int(padding_duration*sample_rate)
-                output_padding_len = self.BVM.model._get_feat_extract_output_lengths(input_padding_len)
+    def tokenize(self, s):
+        return re.split('\s+', s)
+    
+    def untokenize(self, ts):
+        return ' '.join(ts)
+            
+    def equalize(self, s1, s2):
+        l1 = self.tokenize(s1)
+        l2 = self.tokenize(s2)
+        res1 = []
+        res2 = []
+        prev = difflib.Match(0,0,0)
+        for match in difflib.SequenceMatcher(a=l1, b=l2).get_matching_blocks():
+            if (prev.a + prev.size != match.a):
+                for i in range(prev.a + prev.size, match.a):
+                    res2 += ['_' * len(l1[i])]
+                res1 += l1[prev.a + prev.size:match.a]
+            if (prev.b + prev.size != match.b):
+                for i in range(prev.b + prev.size, match.b):
+                    res1 += ['_' * len(l2[i])]
+                res2 += l2[prev.b + prev.size:match.b]
+            res1 += l1[match.a:match.a+match.size]
+            res2 += l2[match.b:match.b+match.size]
+            prev = match
+        return self.untokenize(res1), self.untokenize(res2)
 
-                for start in range(input_padding_len, len(y_mono)-input_padding_len, chunk_len):
-                    await websocket.send_text(f"{self.BVM.wav2vec(y_mono, start, input_padding_len, chunk_len)}")
-  
+    def insert_newlines(self, string, every=64, window=10):
+        result = []
+        from_string = string
+        while len(from_string) > 0:
+            cut_off = every
+            if len(from_string) > every:
+                while (from_string[cut_off-1] != ' ') and (cut_off > (every-window)):
+                    cut_off -= 1
+            else:
+                cut_off = len(from_string)
+            part = from_string[:cut_off]
+            result += [part]
+            from_string = from_string[cut_off:]
+        return result
+
+    def show_comparison(self, s1, s2, width=40, margin=10, sidebyside=True, compact=False):
+        s1, s2 = self.equalize(s1,s2)
+
+        if sidebyside:
+            s1 = self.insert_newlines(s1, width, margin)
+            s2 = self.insert_newlines(s2, width, margin)
+            if compact:
+                for i in range(0, len(s1)):
+                    lft = re.sub(' +', ' ', s1[i].replace('_', '')).ljust(width)
+                    rgt = re.sub(' +', ' ', s2[i].replace('_', '')).ljust(width) 
+                    print(lft + ' | ' + rgt + ' | ')        
+            else:
+                for i in range(0, len(s1)):
+                    lft = s1[i].ljust(width)
+                    rgt = s2[i].ljust(width)
+                    print(lft + ' | ' + rgt + ' | ')
+        else:
+            sentence_1 = s1.split(' ')
+            sentence_2 = s2.split(' ')
+            return_string = ''
+            for i in range(len(sentence_1)):
+                if str(sentence_1[i]).lower() == str(sentence_2[i]).lower():
+                    return_string += "{} ".format(sentence_1[i])
+                else:
+                    if '_' in sentence_1[i]:
+                        return_string += '{} '.format(sentence_2[i])
+                    elif '_' in sentence_2[i]:
+                        return_string += '{} '.format(sentence_1[i])
+                    else:
+                        return_string += '[{} | {}] '.format(sentence_1[i], sentence_2[i])
+            return return_string
 
 api = API()
 
 if __name__=='__main__':
-    uvicorn.run('api:api.app', host='0.0.0.0', port=9090, reload=True)
+    uvicorn.run('api:api.app', host='0.0.0.0', port=9089, reload=True)
