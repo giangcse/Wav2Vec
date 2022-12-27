@@ -20,6 +20,8 @@ from pydantic import BaseModel
 from vietnamesemodel import BaseVietnamese_Model
 from vlsp2020 import LargeVLSP_Model
 
+from infer import infer
+
 class Delete_audio(BaseModel):
     username: str
     audio_name: str
@@ -161,6 +163,12 @@ class API:
             from_string = from_string[cut_off:]
         return result
 
+    def format_text(self,text_input, list_bias_input):
+        print(text_input)
+        bias_list = list_bias_input.strip().split('\n')
+        norm_result = infer([text_input], bias_list)
+        return norm_result[0]
+
     def show_comparison(self, s1, s2, width=40, margin=10, sidebyside=True, compact=False):
         s1, s2 = self.equalize(s1,s2)
 
@@ -191,7 +199,7 @@ class API:
                         return_string += '{} '.format(sentence_1[i])
                     else:
                         return_string += '[{} | {}] '.format(sentence_1[i], sentence_2[i])
-            return return_string
+            return self.format_text(return_string,'')
 
 api = API()
 
