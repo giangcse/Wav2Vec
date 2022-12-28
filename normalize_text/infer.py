@@ -21,7 +21,7 @@ if use_gpu:
     if not torch.cuda.is_available():
         use_gpu = False
 tokenizer = model_handling.init_tokenizer()
-model = EncoderDecoderSpokenNorm.from_pretrained('nguyenvulebinh/spoken-norm-taggen-v2').eval()
+model = EncoderDecoderSpokenNorm.from_pretrained('models/spoken-norm-taggen-v2', local_files_only=True).eval()
 data_collator = DataCollatorForNormSeq2Seq(tokenizer)
 if use_gpu:
     model = model.cuda()
