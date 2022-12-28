@@ -198,9 +198,9 @@ class API:
                     return_data += "{} ".format(sentence_1[i])
                 else:
                     if('_' in sentence_1[i]):
-                        return_data += "{} ".format(sentence_2[i])
+                        return_data += "{}".format(sentence_2[i])
                     elif('_' in sentence_2[i]):
-                        return_data += "{} ".format(sentence_1[i])
+                        return_data += "{}".format(sentence_1[i])
                     return_data += ' '
             return self.format_text(return_data, '')
 
