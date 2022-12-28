@@ -1,8 +1,6 @@
 datasets==1.11.0
 librosa==0.9.2
-pyctcdecode==v0.1.0
 soundfile==0.11.0
-torch==1.13.0
 transformers==4.9.2
 fastapi
 python-multipart

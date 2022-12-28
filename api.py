@@ -20,7 +20,7 @@ from pydantic import BaseModel
 from vietnamesemodel import BaseVietnamese_Model
 from vlsp2020 import LargeVLSP_Model
 
-from infer import infer
+from normalize_text.infer import infer
 
 class Delete_audio(BaseModel):
     username: str

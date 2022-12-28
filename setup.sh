@@ -19,5 +19,5 @@ pip install -U pip
 pip3 install -r requirements.txt
 pip3 install torch torchv torchaudio --extra-index-url https://download.pytorch.org/whl/cpu
 pip3 install kenlm-master.zip
-pip3 install pyctcdecode==v0.1.0 --target=/py37/pyctcdecode01
-pip3 install pyctcdecode==v0.4.0 --target=/py37/pyctcdecode04
+pip3 install pyctcdecode01.zip --target=/py37/pyctcdecode01
+pip3 install pyctcdecode04.zip --target=/py37/pyctcdecode04
