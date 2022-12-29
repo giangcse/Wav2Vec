@@ -109,16 +109,16 @@ class API:
                 if(data['model']=='vlsp'):
                     return_data = self.VLSP.speech_to_text(data)
                     for i in return_data:
-                        await websocket.send_text(str(i))
+                        await websocket.send_text(str(i)+'. ')
                 elif(data['model']=='250h'):
                     return_data = self.BVM.speech_to_text(data)
                     for i in return_data:
-                        await websocket.send_text(str(i))
+                        await websocket.send_text(str(i)+'. ')
                 else:
                     for i in self.VLSP.speech_to_text(data):
-                        return_string_1 += (str(i)+' ')
+                        return_string_1 += (str(i)+'. ')
                     for j in self.BVM.speech_to_text(data):
-                        return_string_2 += (str(j)+' ')
+                        return_string_2 += (str(j)+'. ')
                     # self.show_comparison(return_string_1, return_string_2, sidebyside=False)
                     await websocket.send_text(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
 
