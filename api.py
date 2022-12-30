@@ -87,7 +87,7 @@ class API:
                 self.connection_db.commit()
             except Exception:
                 pass
-            return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERwebsocketsE USERNAME = ?", (str(username),))]})
+            return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ?", (str(username),))]})
         # Endpoint allow to download audio
         @self.app.post("/download_audio")
         async def download_audio(request: Request, audio: Delete_audio):
