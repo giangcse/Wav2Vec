@@ -9,3 +9,4 @@ websockets
 pydub
 speechbrain
 regtag
+VFastPunct
