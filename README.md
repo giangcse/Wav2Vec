@@ -17,3 +17,24 @@ Sử dụng model Wav2Vec để chuyển giọng nói thành văn bản. Ứng d
 
 ## Hướng dẫn cài đặt
 `sudo setup.sh`
+
+## Cần chỉnh sửa các file sau
+> **py37/lib/python3.7/site-packages/transformers/models/wav2vec2_with_lm/processing_wav2vec2_with_lm.py**
+
+Sửa các dòng 31, 85, 139, 188 từ
+
+`pyctcdecode`
+
+thành
+
+`py37.pyctcdecode4.pyctcdecode`
+
+> **py37/lib/python3.7/site-packages/vfastpunct/constants.py**
+
+Sửa dòng 59 từ
+
+`BASE_PATH = 'cache/'`
+
+thành
+
+`BASE_PATH = 'models/'`
