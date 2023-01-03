@@ -9,6 +9,7 @@ import websockets
 import asyncio
 import difflib
 import re
+import bcrypt
 
 from fastapi import FastAPI, Form, File, UploadFile, WebSocket
 from fastapi.requests import Request
@@ -25,10 +26,12 @@ from vfastpunct import VFastPunct
 
 class Delete_audio(BaseModel):
     username: str
+    password: str
     audio_name: str
 
 class Get_audio(BaseModel):
     username: str
+    password: str
 
 class API:
     def __init__(self) -> None:
@@ -56,49 +59,71 @@ class API:
 
         @self.app.get("/")
         async def root(request: Request):
-            return self.templates.TemplateResponse('index.html', context={'request': request})
+            return JSONResponse(status_code=200, content={"Login at /login to continue"})
         # Endpoint get list audio
         @self.app.post("/get_list")
-        async def get_list(request: Request, getAudio: Get_audio):
-            find = self.cursor.execute("SELECT * FROM audios WHERE USERNAME = ?", (str(getAudio.username), ))
-            audios = []
-            for i in find.fetchall():
-                audios.append(i[0])
-            return JSONResponse(status_code=200, content={"data": audios})
+        async def get_list(request: Request, audio: Get_audio):
+            if self.user_login(audio.username, audio.password) is not None:
+                find = self.cursor.execute("SELECT * FROM audios WHERE username = ?", (str(audio.username), ))
+                audios = []
+                for i in find.fetchall():
+                    audios.append(i[0])
+                return JSONResponse(status_code=200, content={"data": audios})
+            else:
+                return JSONResponse(content={"Please login"})
         # Endpoint xoá audio
         @self.app.post("/delete")
         async def delete(request: Request, body: Delete_audio):
-            deleted = self.cursor.execute("DELETE FROM audios WHERE USERNAME = ? AND AUDIO_NAME = ?", (str(body.username), str(body.audio_name), ))
-            self.cursor.commit()
-            if self.cursor.rowcount > 0:
-                return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
+            if self.user_login(body.username, body.password) is not None:
+                deleted = self.cursor.execute("DELETE FROM audios WHERE username = ? AND audio_name = ?", (str(body.username), str(body.audio_name), ))
+                self.cursor.commit()
+                if self.cursor.rowcount > 0:
+                    return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
             else:
                 return JSONResponse(status_code=500, content={"result": "Xoá không thành công"})
         # Enpoint upload audio
         @self.app.post("/")
-        async def upload(request: Request, file: UploadFile = File (...)):
-            username = self.cursor.execute('SELECT USERNAME FROM users WHERE USERNAME = ?', ('admin', )).fetchone()[0]
-            if not os.path.exists(os.path.join('audio', username)):
-                os.mkdir(os.path.join('audio', username))
-            with open(os.path.join('audio', username, file.filename), 'wb') as audio:
-                shutil.copyfileobj(file.file, audio)
-            try:    
-                storage = self.cursor.execute("INSERT INTO audios(AUDIO_NAME, USERNAME, DATETIME) VALUES (?, ?, ?)", (str(os.path.join('audio', username, file.filename)), str(username), datetime.datetime.now().strftime("YYYY-MM-DD hh:mm:ss.xxxxxx")))
-                self.connection_db.commit()
-            except Exception:
-                pass
-            return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIO_NAME FROM audios WHERE USERNAME = ?", (str(username),))]})
+        async def upload(request: Request, file: UploadFile = File (...), username: str = Form(...), password: str = Form(...)):
+            username = self.user_login(username, password)
+            if username is not None:
+                if not os.path.exists(os.path.join('audio', username)):
+                    os.mkdir(os.path.join('audio', username))
+                with open(os.path.join('audio', username, file.filename), 'wb') as audio:
+                    shutil.copyfileobj(file.file, audio)
+                try:    
+                    storage = self.cursor.execute("INSERT INTO audios(AUDIONAME, USERNAME) VALUES (?, ?)", (str(os.path.join('audio', username, file.filename)), str(username), ))
+                    self.connection_db.commit()
+                except Exception:
+                    pass
+                return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIONAME FROM audios WHERE USERNAME = ?", (str(username),))]})
+            else:
+                return JSONResponse(content={"Please login"})
         # Endpoint allow to download audio
         @self.app.post("/download_audio")
         async def download_audio(request: Request, audio: Delete_audio):
-            return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
+            if self.user_login(audio.username, audio.password) is not None:
+                return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
+            else:
+                return JSONResponse(content={"Please login"})
 
         # Endpoint allow to download result
         @self.app.post("/download_text")
         async def download_text(request: Request, audio: Delete_audio):
-            name = str(audio.audio_name)[:-4].split('/')[-1]
-            return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
+            if self.user_login(audio.username, audio.password) is not None:
+                name = str(audio.audio_name)[:-4].split('/')[-1]
+                return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
+            else:
+                return JSONResponse(content={"Please login"})
 
+        # Endpoint login
+        @self.app.post("/login")
+        async def login(request: Request, info: Get_audio):
+            username = info.username
+            password = info.password
+            if self.user_login(username, password) is None:
+                return JSONResponse(content={"Username/Password is incorrect!"})
+            else:
+                return JSONResponse(content={"Login success"}, status_code=200)
         # endpoint websocket
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
@@ -124,6 +149,14 @@ class API:
                         return_string_2 += (str(j)+' ')
                     # self.show_comparison(return_string_1, return_string_2, sidebyside=False)
                     await websocket.send_text(self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False)))
+
+    def user_login(self, username, password):
+        hashed = bcrypt.hashpw(password, bcrypt.gensalt(10)) 
+        find = self.cursor.execute("SELECT username FROM users WHERE username=? AND password=?", (str(username), str(hashed),))
+        if find.fetchone() is None:
+            return None
+        else:
+            return find.fetchone()[0]
 
     def tokenize(self, s):
         return re.split('\s+', s)
