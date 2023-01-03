@@ -67,16 +67,16 @@ class API:
                 find = self.cursor.execute("SELECT * FROM audios WHERE username = ?", (str(audio.username), ))
                 audios = []
                 for i in find.fetchall():
-                    audios.append(i[0])
+                    audios.append(i[2])
                 return JSONResponse(status_code=200, content={"data": audios})
             else:
-                return JSONResponse(content={"Please login"})
+                return JSONResponse(content={"content": "Please login"})
         # Endpoint xoá audio
         @self.app.post("/delete")
         async def delete(request: Request, body: Delete_audio):
             if self.user_login(body.username, body.password) is not None:
                 deleted = self.cursor.execute("DELETE FROM audios WHERE username = ? AND audio_name = ?", (str(body.username), str(body.audio_name), ))
-                self.cursor.commit()
+                self.connection_db.commit()
                 if self.cursor.rowcount > 0:
                     return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
             else:
@@ -84,27 +84,27 @@ class API:
         # Enpoint upload audio
         @self.app.post("/")
         async def upload(request: Request, file: UploadFile = File (...), username: str = Form(...), password: str = Form(...)):
-            username = self.user_login(username, password)
-            if username is not None:
+            res = self.user_login(username, password)
+            if res is not None:
                 if not os.path.exists(os.path.join('audio', username)):
                     os.mkdir(os.path.join('audio', username))
                 with open(os.path.join('audio', username, file.filename), 'wb') as audio:
                     shutil.copyfileobj(file.file, audio)
                 try:    
-                    storage = self.cursor.execute("INSERT INTO audios(AUDIONAME, USERNAME) VALUES (?, ?)", (str(os.path.join('audio', username, file.filename)), str(username), ))
+                    storage = self.cursor.execute("INSERT INTO audios(audio_name, username) VALUES (?, ?)", (str(os.path.join('audio', username, file.filename)), str(username), ))
                     self.connection_db.commit()
                 except Exception:
                     pass
-                return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT AUDIONAME FROM audios WHERE USERNAME = ?", (str(username),))]})
+                return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT audio_name FROM audios WHERE username = ?", (str(username),))]})
             else:
-                return JSONResponse(content={"Please login"})
+                return JSONResponse(content={"content": "Please login"})
         # Endpoint allow to download audio
         @self.app.post("/download_audio")
         async def download_audio(request: Request, audio: Delete_audio):
             if self.user_login(audio.username, audio.password) is not None:
                 return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
             else:
-                return JSONResponse(content={"Please login"})
+                return JSONResponse(content={"content": "Please login"})
 
         # Endpoint allow to download result
         @self.app.post("/download_text")
@@ -113,7 +113,7 @@ class API:
                 name = str(audio.audio_name)[:-4].split('/')[-1]
                 return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
             else:
-                return JSONResponse(content={"Please login"})
+                return JSONResponse(content={"content": "Please login"})
 
         # Endpoint login
         @self.app.post("/login")
@@ -121,9 +121,21 @@ class API:
             username = info.username
             password = info.password
             if self.user_login(username, password) is None:
-                return JSONResponse(content={"Username/Password is incorrect!"})
+                return JSONResponse(content={"content": "Username/Password is incorrect!"})
             else:
-                return JSONResponse(content={"Login success"}, status_code=200)
+                return JSONResponse(content={"content": "Login success"}, status_code=200)
+
+        # Endpoint register
+        @self.app.post("/register")
+        async def register(request: Request, info: Get_audio):
+            username = info.username
+            password = info.password
+            try:
+                insert = self.cursor.execute("INSERT INTO users(username, password) VALUES ('{}', '{}')".format(str(username), str(password)))
+                self.connection_db.commit()
+                return JSONResponse(content={"content": "Create"})
+            except Exception:
+                return JSONResponse(content={"content": str(Exception)})
         # endpoint websocket
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
@@ -134,29 +146,32 @@ class API:
                 return_string_1 = ''
                 return_string_2 = ''
                 return_data = None
-                if(data['model']=='vlsp'):
-                    return_data = self.VLSP.speech_to_text(data)
-                    for i in return_data:
-                        await websocket.send_text(str(i)+' ')
-                elif(data['model']=='250h'):
-                    return_data = self.BVM.speech_to_text(data)
-                    for i in return_data:
-                        await websocket.send_text(str(i)+' ')
+                if self.user_login(data['username'], data['password']) is not None:
+                    if(data['model']=='vlsp'):
+                        return_data = self.VLSP.speech_to_text(data)
+                        for i in return_data:
+                            await websocket.send_text(str(i)+' ')
+                    elif(data['model']=='250h'):
+                        return_data = self.BVM.speech_to_text(data)
+                        for i in return_data:
+                            await websocket.send_text(str(i)+' ')
+                    else:
+                        for i in self.VLSP.speech_to_text(data):
+                            return_string_1 += (str(i)+' ')
+                        for j in self.BVM.speech_to_text(data):
+                            return_string_2 += (str(j)+' ')
+                        # self.show_comparison(return_string_1, return_string_2, sidebyside=False)
+                        await websocket.send_text(self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False)))
                 else:
-                    for i in self.VLSP.speech_to_text(data):
-                        return_string_1 += (str(i)+' ')
-                    for j in self.BVM.speech_to_text(data):
-                        return_string_2 += (str(j)+' ')
-                    # self.show_comparison(return_string_1, return_string_2, sidebyside=False)
-                    await websocket.send_text(self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False)))
+                    await websocket.send_text("Please login")
 
     def user_login(self, username, password):
-        hashed = bcrypt.hashpw(password, bcrypt.gensalt(10)) 
-        find = self.cursor.execute("SELECT username FROM users WHERE username=? AND password=?", (str(username), str(hashed),))
-        if find.fetchone() is None:
+        find = self.cursor.execute("SELECT username FROM users WHERE username='{}' AND password='{}'".format(str(username), str(password)))
+        res = find.fetchone()
+        if res is None:
             return None
         else:
-            return find.fetchone()[0]
+            return res[0]
 
     def tokenize(self, s):
         return re.split('\s+', s)
