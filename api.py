@@ -59,7 +59,7 @@ class API:
 
         @self.app.get("/")
         async def root(request: Request):
-            return JSONResponse(status_code=200, content={"content": "Login at /login to continue"})
+            return JSONResponse(status_code=200, content={"success": "Login at /login to continue"})
         # Endpoint get list audio
         @self.app.post("/get_list")
         async def get_list(request: Request, audio: Get_audio):
@@ -70,7 +70,7 @@ class API:
                     audios.append(i[2])
                 return JSONResponse(status_code=200, content={"data": audios})
             else:
-                return JSONResponse(content={"content": "Please login"})
+                return JSONResponse(content={"error": "Please login"})
         # Endpoint xoá audio
         @self.app.post("/delete")
         async def delete(request: Request, body: Delete_audio):
@@ -100,23 +100,29 @@ class API:
                     self.connection_db.commit()
                 return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT audio_name FROM audios WHERE username = ?", (str(username),))]})
             else:
-                return JSONResponse(content={"content": "Please login"})
+                return JSONResponse(content={"error": "Please login"})
         # Endpoint allow to download audio
         @self.app.post("/download_audio")
         async def download_audio(request: Request, audio: Delete_audio):
             if self.user_login(audio.username, audio.password) is not None:
-                return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
+                if os.path.exists(audio.audio_name):
+                    return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
+                else:
+                    return JSONResponse(content={"error": "File not found"})
             else:
-                return JSONResponse(content={"content": "Please login"})
+                return JSONResponse(content={"error": "Please login"})
 
         # Endpoint allow to download result
         @self.app.post("/download_text")
         async def download_text(request: Request, audio: Delete_audio):
             if self.user_login(audio.username, audio.password) is not None:
                 name = str(audio.audio_name)[:-4].split('/')[-1]
-                return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
+                if os.path.exists(str(audio.audio_name)[:-4]+'.txt'):
+                    return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
+                else:
+                    return JSONResponse(content={"error": "File not found"})
             else:
-                return JSONResponse(content={"content": "Please login"})
+                return JSONResponse(content={"error": "Please login"})
 
         # Endpoint login
         @self.app.post("/login")
@@ -124,7 +130,7 @@ class API:
             username = info.username
             password = info.password
             if self.user_login(username, password) is None:
-                return JSONResponse(content={"content": "Username/Password is incorrect!"})
+                return JSONResponse(content={"error": "Username/Password is incorrect!"})
             else:
                 return JSONResponse(content={"content": "Login success"}, status_code=200)
 
