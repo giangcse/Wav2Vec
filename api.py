@@ -82,7 +82,7 @@ class API:
             else:
                 return JSONResponse(status_code=500, content={"result": "Xoá không thành công"})
         # Enpoint upload audio
-        @self.app.post("/")
+        @self.app.post("/upload")
         async def upload(request: Request, file: UploadFile = File (...), username: str = Form(...), password: str = Form(...)):
             res = self.user_login(username, password)
             if res is not None:
@@ -90,11 +90,19 @@ class API:
                     os.mkdir(os.path.join('audio', username))
                 with open(os.path.join('audio', username, file.filename), 'wb') as audio:
                     shutil.copyfileobj(file.file, audio)
-                try:    
-                    storage = self.cursor.execute("INSERT INTO audios(audio_name, username) VALUES (?, ?)", (str(os.path.join('audio', username, file.filename)), str(username), ))
+                
+                find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (username, os.path.join('audio', username, file.filename), ))
+                if find.fetchone()[0] == 0:
+                    insert = self.cursor.execute("INSERT INTO audios(username, audio_name, created_at, updated_at) VALUES (?, ?, ?, ?)", (username, os.path.join('audio', username, file.filename), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
                     self.connection_db.commit()
-                except Exception:
-                    pass
+                else:
+                    update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), username, os.path.join('audio', username, file.filename)))
+                    self.connection_db.commit()
+                # try:    
+                #     storage = self.cursor.execute("INSERT INTO audios(audio_name, username) VALUES (?, ?)", (str(os.path.join('audio', username, file.filename)), str(username), ))
+                #     self.connection_db.commit()
+                # except Exception:
+                #     pass
                 return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT audio_name FROM audios WHERE username = ?", (str(username),))]})
             else:
                 return JSONResponse(content={"content": "Please login"})
@@ -133,9 +141,9 @@ class API:
             try:
                 insert = self.cursor.execute("INSERT INTO users(username, password) VALUES ('{}', '{}')".format(str(username), str(password)))
                 self.connection_db.commit()
-                return JSONResponse(content={"content": "Create"})
-            except Exception:
-                return JSONResponse(content={"content": str(Exception)})
+                return JSONResponse(content={"success": "Created"})
+            except sqlite3.IntegrityError:
+                return JSONResponse(content={"error": "Username is exist"})
         # endpoint websocket
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
