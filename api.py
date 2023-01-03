@@ -77,7 +77,7 @@ class API:
             if self.user_login(body.username, body.password) is not None:
                 deleted = self.cursor.execute("DELETE FROM audios WHERE username = ? AND audio_name = ?", (str(body.username), str(body.audio_name), ))
                 self.connection_db.commit()
-                if self.cursor.rowcount > 0:
+                if self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (body.username, body.audio_name, )) == 0:
                     return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
             else:
                 return JSONResponse(status_code=500, content={"result": "Xoá không thành công"})
@@ -98,11 +98,6 @@ class API:
                 else:
                     update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), username, os.path.join('audio', username, file.filename)))
                     self.connection_db.commit()
-                # try:    
-                #     storage = self.cursor.execute("INSERT INTO audios(audio_name, username) VALUES (?, ?)", (str(os.path.join('audio', username, file.filename)), str(username), ))
-                #     self.connection_db.commit()
-                # except Exception:
-                #     pass
                 return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT audio_name FROM audios WHERE username = ?", (str(username),))]})
             else:
                 return JSONResponse(content={"content": "Please login"})
