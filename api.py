@@ -59,7 +59,7 @@ class API:
 
         @self.app.get("/")
         async def root(request: Request):
-            return JSONResponse(status_code=200, content={"Login at /login to continue"})
+            return JSONResponse(status_code=200, content={"content": "Login at /login to continue"})
         # Endpoint get list audio
         @self.app.post("/get_list")
         async def get_list(request: Request, audio: Get_audio):
