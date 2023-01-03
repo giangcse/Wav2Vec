@@ -77,8 +77,8 @@ class API:
             if self.user_login(body.username, body.password) is not None:
                 deleted = self.cursor.execute("DELETE FROM audios WHERE username = ? AND audio_name = ?", (str(body.username), str(body.audio_name), ))
                 self.connection_db.commit()
-                if self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (body.username, body.audio_name, )) == 0:
-                    return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
+                # if self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (body.username, body.audio_name, )) == 0:
+                return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
             else:
                 return JSONResponse(status_code=500, content={"result": "Xoá không thành công"})
         # Enpoint upload audio
