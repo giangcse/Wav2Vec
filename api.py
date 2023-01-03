@@ -162,9 +162,9 @@ class API:
                             return_string_2 += (str(j)+' ')
                         last_result = self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
                         log_file =  open((data['audio'])[:-4] + '.txt', 'w', encoding='utf8')
-                        log_file.write()
+                        log_file.write(last_result)
                         log_file.close()
-                        await websocket.send_text(self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False)))
+                        await websocket.send_text(last_result)
                 else:
                     await websocket.send_text("Please login")
 
