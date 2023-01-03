@@ -160,7 +160,10 @@ class API:
                             return_string_1 += (str(i)+' ')
                         for j in self.BVM.speech_to_text(data):
                             return_string_2 += (str(j)+' ')
-                        # self.show_comparison(return_string_1, return_string_2, sidebyside=False)
+                        last_result = self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
+                        log_file =  open((data['audio'])[:-4] + '.txt', 'w', encoding='utf8')
+                        log_file.write()
+                        log_file.close()
                         await websocket.send_text(self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False)))
                 else:
                     await websocket.send_text("Please login")
