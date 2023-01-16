@@ -37,6 +37,14 @@ class User(BaseModel):
     username: str
     password: str
 
+class Convert(BaseModel):
+    token: str
+    audio: str
+    denoise: Union[int, 0]
+    keyframe: Union[int, 0]
+    LM: Union[int, 1]
+    model: Union[str, None]
+
 class API:
     def __init__(self) -> None:
         # Khởi tạo thông tin kết nối đến Database
@@ -188,8 +196,30 @@ class API:
 
         # Endpoint for eCabinet
         @self.app.post("/stt")
-        def speechToText(request: Request, header: Union[str, None] = Header(default=None)):
-            info = json.loads(header)
+        async def speech_to_text(request: Request, body: Convert):
+            return_string_1 = ''
+            return_string_2 = ''
+            return_data = None
+            if self.check_token(body['token']) is not False:
+                if os.path.exists(body['audio']):
+                    if(body['model']=='vlsp'):
+                        return_data = self.VLSP.speech_to_text(body)
+                    elif(body['model']=='250h'):
+                        return_data = self.BVM.speech_to_text(body)
+                    else:
+                        for i in self.VLSP.speech_to_text(body):
+                            return_string_1 += (str(i)+' ')
+                        for j in self.BVM.speech_to_text(body):
+                            return_string_2 += (str(j)+' ')
+                        last_result = self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
+                        log_file =  open((body['audio'])[:-4] + '.txt', 'w', encoding='utf8')
+                        log_file.write(last_result)
+                        log_file.close()
+                        return last_result
+                else:
+                    return "File not found"
+            else:
+                return "Please login"
             
 
     def create_token(self, username, password):
