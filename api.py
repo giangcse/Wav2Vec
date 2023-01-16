@@ -12,12 +12,13 @@ import re
 import hashlib
 import string, random
 
-from fastapi import FastAPI, Form, File, UploadFile, WebSocket
+from fastapi import FastAPI, Form, File, UploadFile, WebSocket, Header
 from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
 from pydantic import BaseModel
+from typing import Union
 
 from vietnamesemodel import BaseVietnamese_Model
 from vlsp2020 import LargeVLSP_Model
@@ -184,6 +185,12 @@ class API:
                         await websocket.send_text("File not found")
                 else:
                     await websocket.send_text("Please login")
+
+        # Endpoint for eCabinet
+        @self.app.post("/stt")
+        def speechToText(request: Request, header: Union[str, None] = Header(default=None)):
+            info = json.loads(header)
+            
 
     def create_token(self, username, password):
         find = self.cursor.execute("SELECT username FROM users WHERE username='{}' AND password='{}'".format(str(username), hashlib.sha512(password.encode()).hexdigest()))

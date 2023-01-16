@@ -10,7 +10,8 @@
             "request": "launch",
             "module": "uvicorn",
             "args": [
-                "api:api.app"
+                "api:api.app",
+                "--port=9090"
             ],
             "jinja": true,
             "justMyCode": true
