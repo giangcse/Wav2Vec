@@ -37,14 +37,6 @@ class User(BaseModel):
     username: str
     password: str
 
-class Convert(BaseModel):
-    token: str
-    audio: str
-    denoise: Union[int, 0]
-    keyframe: Union[int, 0]
-    LM: Union[int, 1]
-    model: Union[str, None]
-
 class API:
     def __init__(self) -> None:
         # Khởi tạo thông tin kết nối đến Database
