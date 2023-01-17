@@ -238,12 +238,12 @@ class API:
 
     def check_token(self, token):
         find = self.cursor.execute("SELECT username FROM users WHERE token = ?", (str(token), ))
-        res = find.fetchone()
+        res = find.fetchall()
         if res is None:
             return False
         else:
             now = datetime.datetime.now()
-            exp = datetime.datetime.strptime(res[3], "%Y-%m-%d %H:%M:%S")
+            exp = datetime.datetime.strptime(res[0][3], "%Y-%m-%d %H:%M:%S")
             est = exp - now
             if(est.total_seconds() > 0):
                 return res[0]
