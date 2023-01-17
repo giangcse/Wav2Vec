@@ -205,9 +205,9 @@ class API:
                     self.connection_db.commit()
 
                 # upload is done, convert speech to text phase
-                return_string_1 = None
-                return_string_2 = None
-                return_data = None
+                return_string_1 = ''
+                return_string_2 = ''
+                return_data = ''
                 data = {'audio': os.path.join('audio', res, file.filename), 'denoise': int(denoise), 'keyframe': int(keyframe), 'LM': int(enable_lm)}
                 if(str(model).lower() == 'vlsp'):
                     for i in self.VLSP.speech_to_text(data):
