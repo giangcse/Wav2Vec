@@ -196,30 +196,41 @@ class API:
 
         # Endpoint for eCabinet
         @self.app.post("/stt")
-        async def speech_to_text(request: Request, body: Convert):
-            return_string_1 = ''
-            return_string_2 = ''
-            return_data = None
-            if self.check_token(body['token']) is not False:
-                if os.path.exists(body['audio']):
-                    if(body['model']=='vlsp'):
-                        return_data = self.VLSP.speech_to_text(body)
-                    elif(body['model']=='250h'):
-                        return_data = self.BVM.speech_to_text(body)
-                    else:
-                        for i in self.VLSP.speech_to_text(body):
-                            return_string_1 += (str(i)+' ')
-                        for j in self.BVM.speech_to_text(body):
-                            return_string_2 += (str(j)+' ')
-                        last_result = self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
-                        log_file =  open((body['audio'])[:-4] + '.txt', 'w', encoding='utf8')
-                        log_file.write(last_result)
-                        log_file.close()
-                        return last_result
+        async def upload(request: Request, file: UploadFile = File (...), token: str = Form(...), enable_lm: int = Form(...), denoise: int = Form(...), keyframe: int = Form(...), model: str = Form(...)):
+            res = self.check_token(token)
+            if res is not False:
+                if not os.path.exists(os.path.join('audio', res)):
+                    os.mkdir(os.path.join('audio', res))
+                with open(os.path.join('audio', res, file.filename), 'wb') as audio:
+                    shutil.copyfileobj(file.file, audio)
+                
+                find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
+                if find.fetchone()[0] == 0:
+                    insert = self.cursor.execute("INSERT INTO audios(username, audio_name, created_at, updated_at) VALUES (?, ?, ?, ?)", (res, os.path.join('audio', res, file.filename), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                    self.connection_db.commit()
                 else:
-                    return "File not found"
+                    update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
+                    self.connection_db.commit()
+
+                # upload is done, convert speech to text phase
+                return_string_1 = None
+                return_string_2 = None
+                return_data = None
+                data = {'audio': os.path.join('audio', res, file.filename), 'denoise': int(denoise), 'keyframe': int(keyframe), 'LM': int(enable_lm)}
+                if(str(model).lower() == 'vlsp'):
+                    return_data = self.VLSP.speech_to_text(data)
+                elif(str(model).lower() == '250h'):
+                    return_data = self.BVM.speech_to_text(data)
+                else:
+                    return_string_1 = self.VLSP.speech_to_text(data)
+                    return_string_2 = self.BVM.speech_to_text(data)
+                    return_data = self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
+                log_file =  open((data['audio'])[:-4] + '.txt', 'w', encoding='utf8')
+                log_file.write(return_data)
+                log_file.close()
+                return JSONResponse(status_code=200, content={"result": return_data, "file_result": (data['audio'])[:-4] + '.txt'})
             else:
-                return "Please login"
+                return JSONResponse(content={"error": "Please login"})
             
 
     def create_token(self, username, password):
@@ -229,7 +240,7 @@ class API:
         if res is None:
             return None
         else:
-            update = self.cursor.execute("UPDATE users SET token = ? WHERE username = ?", (str(token), str(username), ))
+            update = self.cursor.execute("UPDATE users SET token = ?, token_exp = ? WHERE username = ?", (str(token), (datetime.datetime.now() + datetime.timedelta(hours=24)).strftime("%Y-%m-%d %H:%M:%S"), str(username), ))
             self.connection_db.commit()
             return token
 
@@ -239,7 +250,13 @@ class API:
         if res is None:
             return False
         else:
-            return res[0]
+            now = datetime.datetime.now()
+            exp = datetime.datetime.strptime(res[3], "%Y-%m-%d %H:%M:%S")
+            est = exp - now
+            if(est.total_seconds() > 0):
+                return res[0]
+            else:
+                return False
 
     def tokenize(self, s):
         return re.split('\s+', s)
