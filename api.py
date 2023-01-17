@@ -210,12 +210,16 @@ class API:
                 return_data = None
                 data = {'audio': os.path.join('audio', res, file.filename), 'denoise': int(denoise), 'keyframe': int(keyframe), 'LM': int(enable_lm)}
                 if(str(model).lower() == 'vlsp'):
-                    return_data = self.VLSP.speech_to_text(data)
+                    for i in self.VLSP.speech_to_text(data):
+                        return_data += str(i) + ' '
                 elif(str(model).lower() == '250h'):
-                    return_data = self.BVM.speech_to_text(data)
+                    for i in self.BVM.speech_to_text(data):
+                        return_data += str(i) + ' '
                 else:
-                    return_string_1 = self.VLSP.speech_to_text(data)
-                    return_string_2 = self.BVM.speech_to_text(data)
+                    for i in self.VLSP.speech_to_text(data):
+                        return_string_1 += str(i) + ' '
+                    for i in self.BVM.speech_to_text(data):
+                        return_string_2 += str(i) + ' '
                     return_data = self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
                 log_file =  open((data['audio'])[:-4] + '.txt', 'w', encoding='utf8')
                 log_file.write(return_data)
@@ -237,7 +241,7 @@ class API:
             return token
 
     def check_token(self, token):
-        find = self.cursor.execute("SELECT username FROM users WHERE token = ?", (str(token), ))
+        find = self.cursor.execute("SELECT * FROM users WHERE token = ?", (str(token), ))
         res = find.fetchall()
         if res is None:
             return False
@@ -246,7 +250,7 @@ class API:
             exp = datetime.datetime.strptime(res[0][3], "%Y-%m-%d %H:%M:%S")
             est = exp - now
             if(est.total_seconds() > 0):
-                return res[0]
+                return res[0][0]
             else:
                 return False
 
