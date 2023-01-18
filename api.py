@@ -69,11 +69,14 @@ class API:
         async def get_list(request: Request, audio: Get_audio):
             res = self.check_token(audio.token)
             if res is not False:
-                find = self.cursor.execute("SELECT * FROM audios WHERE username = ?", (str(res), ))
-                audios = []
-                for i in find.fetchall():
-                    audios.append(i[2])
-                return JSONResponse(status_code=200, content={"data": audios})
+                if res is not "Invailid token":
+                    find = self.cursor.execute("SELECT * FROM audios WHERE username = ?", (str(res), ))
+                    audios = []
+                    for i in find.fetchall():
+                        audios.append(i[2])
+                    return JSONResponse(status_code=200, content={"data": audios})
+                else:
+                    return JSONResponse(content={"error": "Token exprited"})
             else:
                 return JSONResponse(content={"error": "Please login"})
         # Endpoint xoá audio
@@ -81,10 +84,13 @@ class API:
         async def delete(request: Request, body: Delete_audio):
             res = self.check_token(body.token)
             if res is not False:
-                deleted = self.cursor.execute("DELETE FROM audios WHERE username = ? AND audio_name = ?", (str(res), str(body.audio_name), ))
-                self.connection_db.commit()
-                # if self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (body.username, body.audio_name, )) == 0:
-                return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
+                if res is not "Invailid token":
+                    deleted = self.cursor.execute("DELETE FROM audios WHERE username = ? AND audio_name = ?", (str(res), str(body.audio_name), ))
+                    self.connection_db.commit()
+                    # if self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (body.username, body.audio_name, )) == 0:
+                    return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
+                else:
+                    return JSONResponse(content={"error": "Token exprited"})
             else:
                 return JSONResponse(status_code=500, content={"result": "Xoá không thành công"})
         # Enpoint upload audio
@@ -92,42 +98,52 @@ class API:
         async def upload(request: Request, file: UploadFile = File (...), token: str = Form(...)):
             res = self.check_token(token)
             if res is not False:
-
-                if not os.path.exists(os.path.join('audio', res)):
-                    os.mkdir(os.path.join('audio', res))
-                with open(os.path.join('audio', res, file.filename), 'wb') as audio:
-                    shutil.copyfileobj(file.file, audio)
-                
-                find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
-                if find.fetchone()[0] == 0:
-                    insert = self.cursor.execute("INSERT INTO audios(username, audio_name, created_at, updated_at) VALUES (?, ?, ?, ?)", (res, os.path.join('audio', res, file.filename), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-                    self.connection_db.commit()
+                if res is not "Invailid token":
+                    if not os.path.exists(os.path.join('audio', res)):
+                        os.mkdir(os.path.join('audio', res))
+                    with open(os.path.join('audio', res, file.filename), 'wb') as audio:
+                        shutil.copyfileobj(file.file, audio)
+                    
+                    find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
+                    if find.fetchone()[0] == 0:
+                        insert = self.cursor.execute("INSERT INTO audios(username, audio_name, created_at, updated_at) VALUES (?, ?, ?, ?)", (res, os.path.join('audio', res, file.filename), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                        self.connection_db.commit()
+                    else:
+                        update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
+                        self.connection_db.commit()
+                    return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT audio_name FROM audios WHERE username = ?", (str(res),))]})
                 else:
-                    update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
-                    self.connection_db.commit()
-                return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT audio_name FROM audios WHERE username = ?", (str(res),))]})
+                    return JSONResponse(content={"error": "Token exprited"})
             else:
                 return JSONResponse(content={"error": "Please login"})
         # Endpoint allow to download audio
         @self.app.post("/download_audio")
         async def download_audio(request: Request, audio: Delete_audio):
-            if self.check_token(audio.token) is not False:
-                if os.path.exists(str(audio.audio_name)):
-                    return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
+            res = self.check_token(audio.token)
+            if res is not False:
+                if res is not "Invailid token":
+                    if os.path.exists(str(audio.audio_name)):
+                        return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
+                    else:
+                        return JSONResponse(content={"error": "File not found"})
                 else:
-                    return JSONResponse(content={"error": "File not found"})
+                    return JSONResponse(content={"error": "Token exprited"})
             else:
                 return JSONResponse(content={"error": "Please login"})
 
         # Endpoint allow to download result
         @self.app.post("/download_text")
         async def download_text(request: Request, audio: Delete_audio):
-            if self.check_token(audio.token) is not False:
-                name = str(audio.audio_name)[:-4].split('/')[-1]
-                if os.path.exists(str(audio.audio_name)[:-4]+'.txt'):
-                    return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
+            res = self.check_token(audio.token)
+            if res is not False:
+                if res is not "Invailid token":
+                    name = str(audio.audio_name)[:-4].split('/')[-1]
+                    if os.path.exists(str(audio.audio_name)[:-4]+'.txt'):
+                        return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
+                    else:
+                        return JSONResponse(content={"error": "File not found"})
                 else:
-                    return JSONResponse(content={"error": "File not found"})
+                    return JSONResponse(content={"error": "Token Exprited"})
             else:
                 return JSONResponse(content={"error": "Please login"})
 
@@ -191,40 +207,43 @@ class API:
         async def upload(request: Request, file: UploadFile = File (...), token: str = Form(...), enable_lm: int = Form(...), denoise: int = Form(...), keyframe: int = Form(...), model: str = Form(...)):
             res = self.check_token(token)
             if res is not False:
-                if not os.path.exists(os.path.join('audio', res)):
-                    os.mkdir(os.path.join('audio', res))
-                with open(os.path.join('audio', res, file.filename), 'wb') as audio:
-                    shutil.copyfileobj(file.file, audio)
-                
-                find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
-                if find.fetchone()[0] == 0:
-                    insert = self.cursor.execute("INSERT INTO audios(username, audio_name, created_at, updated_at) VALUES (?, ?, ?, ?)", (res, os.path.join('audio', res, file.filename), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-                    self.connection_db.commit()
-                else:
-                    update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
-                    self.connection_db.commit()
+                if res is not "Invailid token":
+                    if not os.path.exists(os.path.join('audio', res)):
+                        os.mkdir(os.path.join('audio', res))
+                    with open(os.path.join('audio', res, file.filename), 'wb') as audio:
+                        shutil.copyfileobj(file.file, audio)
+                    
+                    find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
+                    if find.fetchone()[0] == 0:
+                        insert = self.cursor.execute("INSERT INTO audios(username, audio_name, created_at, updated_at) VALUES (?, ?, ?, ?)", (res, os.path.join('audio', res, file.filename), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                        self.connection_db.commit()
+                    else:
+                        update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
+                        self.connection_db.commit()
 
-                # upload is done, convert speech to text phase
-                return_string_1 = ''
-                return_string_2 = ''
-                return_data = ''
-                data = {'audio': os.path.join('audio', res, file.filename), 'denoise': int(denoise), 'keyframe': int(keyframe), 'LM': int(enable_lm)}
-                if(str(model).lower() == 'vlsp'):
-                    for i in self.VLSP.speech_to_text(data):
-                        return_data += str(i) + ' '
-                elif(str(model).lower() == '250h'):
-                    for i in self.BVM.speech_to_text(data):
-                        return_data += str(i) + ' '
+                    # upload is done, convert speech to text phase
+                    return_string_1 = ''
+                    return_string_2 = ''
+                    return_data = ''
+                    data = {'audio': os.path.join('audio', res, file.filename), 'denoise': int(denoise), 'keyframe': int(keyframe), 'LM': int(enable_lm)}
+                    if(str(model).lower() == 'vlsp'):
+                        for i in self.VLSP.speech_to_text(data):
+                            return_data += str(i) + ' '
+                    elif(str(model).lower() == '250h'):
+                        for i in self.BVM.speech_to_text(data):
+                            return_data += str(i) + ' '
+                    else:
+                        for i in self.VLSP.speech_to_text(data):
+                            return_string_1 += str(i) + ' '
+                        for i in self.BVM.speech_to_text(data):
+                            return_string_2 += str(i) + ' '
+                        return_data = self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
+                    log_file =  open((data['audio'])[:-4] + '.txt', 'w', encoding='utf8')
+                    log_file.write(return_data)
+                    log_file.close()
+                    return JSONResponse(status_code=200, content={"result": return_data, "file_result": (data['audio'])[:-4] + '.txt'})
                 else:
-                    for i in self.VLSP.speech_to_text(data):
-                        return_string_1 += str(i) + ' '
-                    for i in self.BVM.speech_to_text(data):
-                        return_string_2 += str(i) + ' '
-                    return_data = self.punc(self.show_comparison(return_string_1, return_string_2, sidebyside=False))
-                log_file =  open((data['audio'])[:-4] + '.txt', 'w', encoding='utf8')
-                log_file.write(return_data)
-                log_file.close()
-                return JSONResponse(status_code=200, content={"result": return_data, "file_result": (data['audio'])[:-4] + '.txt'})
+                    return JSONResponse(content={"error": "Token exprited"})
             else:
                 return JSONResponse(content={"error": "Please login"})
             
@@ -242,17 +261,19 @@ class API:
 
     def check_token(self, token):
         find = self.cursor.execute("SELECT * FROM users WHERE token = ?", (str(token), ))
-        res = find.fetchall()
+        res = find.fetchone()
         if res is None:
             return False
         else:
-            now = datetime.datetime.now()
-            exp = datetime.datetime.strptime(res[0][3], "%Y-%m-%d %H:%M:%S")
-            est = exp - now
-            if(est.total_seconds() > 0):
-                return res[0][0]
-            else:
-                return False
+            try:
+                now = datetime.datetime.now()
+                exp = datetime.datetime.strptime(res[0][3], "%Y-%m-%d %H:%M:%S")
+                est = exp - now
+                if(est.total_seconds() > 0):
+                    return res[0][0]
+            except Exception:
+                return "Invailid token"
+            
 
     def tokenize(self, s):
         return re.split('\s+', s)

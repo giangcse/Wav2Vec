@@ -1,0 +1,309 @@
+{
+	"info": {
+		"_postman_id": "536b9ff3-f5f0-410c-84fd-15497b9854e9",
+		"name": "Speech2Text",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "25051016"
+	},
+	"item": [
+		{
+			"name": "Homepage",
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://10.91.13.139:9090",
+					"protocol": "http",
+					"host": [
+						"10",
+						"91",
+						"13",
+						"139"
+					],
+					"port": "9090"
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Register",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"vinhpt\",\n    \"password\": \"admin@123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://10.91.13.139:9090/register",
+					"protocol": "http",
+					"host": [
+						"10",
+						"91",
+						"13",
+						"139"
+					],
+					"port": "9090",
+					"path": [
+						"register"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Login",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"username\": \"vinhpt\",\n    \"password\": \"admin@123\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://10.91.13.139:9090/login",
+					"protocol": "http",
+					"host": [
+						"10",
+						"91",
+						"13",
+						"139"
+					],
+					"port": "9090",
+					"path": [
+						"login"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Get list audio",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"token\": \"befmnfyrxzgskat50j741nx8imlwtsdm1rbnnailv2tq8d2q0w\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://10.91.13.139:9090/get_list",
+					"protocol": "http",
+					"host": [
+						"10",
+						"91",
+						"13",
+						"139"
+					],
+					"port": "9090",
+					"path": [
+						"get_list"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Upload audio",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": "/home/giangpt/Downloads/Sound Recordings/Zing_1.wav"
+						},
+						{
+							"key": "token",
+							"value": "k1q0qwuzalb0cic55cg6j4hyrx9s8scmyrwfme9jm2l1qqrbss",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://10.91.13.139:9090/upload",
+					"protocol": "http",
+					"host": [
+						"10",
+						"91",
+						"13",
+						"139"
+					],
+					"port": "9090",
+					"path": [
+						"upload"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Delete audio",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"token\": \"befmnfyrxzgskat50j741nx8imlwtsdm1rbnnailv2tq8d2q0w\",\n    \"audio_name\": \"audio/vinhpt/VNE_5.wav\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://10.91.13.139:9090/delete",
+					"protocol": "http",
+					"host": [
+						"10",
+						"91",
+						"13",
+						"139"
+					],
+					"port": "9090",
+					"path": [
+						"delete"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Download audio",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"token\": \"befmnfyrxzgskat50j741nx8imlwtsdm1rbnnailv2tq8d2q0w\",\n    \"audio_name\": \"audio/admin/VNE_1.wav\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://10.91.13.139:9090/download_audio",
+					"protocol": "http",
+					"host": [
+						"10",
+						"91",
+						"13",
+						"139"
+					],
+					"port": "9090",
+					"path": [
+						"download_audio"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Download text",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n    \"token\": \"befmnfyrxzgskat50j741nx8imlwtsdm1rbnnailv2tq8d2q0w\",\n    \"audio_name\": \"audio/admin/VNE_1.wav\"\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://10.91.13.139:9090/download_text",
+					"protocol": "http",
+					"host": [
+						"10",
+						"91",
+						"13",
+						"139"
+					],
+					"port": "9090",
+					"path": [
+						"download_text"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Speech to text",
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "formdata",
+					"formdata": [
+						{
+							"key": "file",
+							"type": "file",
+							"src": "/home/giangpt/Downloads/Sound Recordings/BaoMoi_Nu_Bac.wav"
+						},
+						{
+							"key": "token",
+							"value": "rwgh6c2kxalg3rimigll7byk6ien77dm1xzta8qrn8fh314x4m",
+							"type": "text"
+						},
+						{
+							"key": "enable_lm",
+							"value": "1",
+							"type": "text"
+						},
+						{
+							"key": "denoise",
+							"value": "0",
+							"type": "text"
+						},
+						{
+							"key": "keyframe",
+							"value": "0",
+							"type": "text"
+						},
+						{
+							"key": "model",
+							"value": " ",
+							"type": "text"
+						}
+					]
+				},
+				"url": {
+					"raw": "http://10.91.13.139:9090/stt",
+					"protocol": "http",
+					"host": [
+						"10",
+						"91",
+						"13",
+						"139"
+					],
+					"port": "9090",
+					"path": [
+						"stt"
+					]
+				}
+			},
+			"response": []
+		}
+	]
+}
