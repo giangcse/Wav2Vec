@@ -69,7 +69,7 @@ class API:
         async def get_list(request: Request, audio: Get_audio):
             res = self.check_token(audio.token)
             if res is not False:
-                if res is not "Invailid token":
+                if res != "Invailid token":
                     find = self.cursor.execute("SELECT * FROM audios WHERE username = ?", (str(res), ))
                     audios = []
                     for i in find.fetchall():
@@ -84,7 +84,7 @@ class API:
         async def delete(request: Request, body: Delete_audio):
             res = self.check_token(body.token)
             if res is not False:
-                if res is not "Invailid token":
+                if res != "Invailid token":
                     deleted = self.cursor.execute("DELETE FROM audios WHERE username = ? AND audio_name = ?", (str(res), str(body.audio_name), ))
                     self.connection_db.commit()
                     # if self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (body.username, body.audio_name, )) == 0:
@@ -98,7 +98,7 @@ class API:
         async def upload(request: Request, file: UploadFile = File (...), token: str = Form(...)):
             res = self.check_token(token)
             if res is not False:
-                if res is not "Invailid token":
+                if res != "Invailid token":
                     if not os.path.exists(os.path.join('audio', res)):
                         os.mkdir(os.path.join('audio', res))
                     with open(os.path.join('audio', res, file.filename), 'wb') as audio:
@@ -121,7 +121,7 @@ class API:
         async def download_audio(request: Request, audio: Delete_audio):
             res = self.check_token(audio.token)
             if res is not False:
-                if res is not "Invailid token":
+                if res != "Invailid token":
                     if os.path.exists(str(audio.audio_name)):
                         return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
                     else:
@@ -136,7 +136,7 @@ class API:
         async def download_text(request: Request, audio: Delete_audio):
             res = self.check_token(audio.token)
             if res is not False:
-                if res is not "Invailid token":
+                if res != "Invailid token":
                     name = str(audio.audio_name)[:-4].split('/')[-1]
                     if os.path.exists(str(audio.audio_name)[:-4]+'.txt'):
                         return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
@@ -207,7 +207,7 @@ class API:
         async def upload(request: Request, file: UploadFile = File (...), token: str = Form(...), enable_lm: int = Form(...), denoise: int = Form(...), keyframe: int = Form(...), model: str = Form(...)):
             res = self.check_token(token)
             if res is not False:
-                if res is not "Invailid token":
+                if res != "Invailid token":
                     if not os.path.exists(os.path.join('audio', res)):
                         os.mkdir(os.path.join('audio', res))
                     with open(os.path.join('audio', res, file.filename), 'wb') as audio:
