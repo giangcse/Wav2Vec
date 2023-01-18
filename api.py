@@ -261,7 +261,7 @@ class API:
 
     def check_token(self, token):
         find = self.cursor.execute("SELECT * FROM users WHERE token = ?", (str(token), ))
-        res = find.fetchone()
+        res = find.fetchall()
         if res is None:
             return False
         else:
