@@ -168,6 +168,10 @@ class API:
                     self.connection_db.commit()    
             return JSONResponse(content={"contet": "Logout success"}, status_code=status.HTTP_200_OK)
                 
+        # Endpoint check token exp
+        @self.app.post("/check_token")
+        async def check_token_endpoint(request: Request, info: Get_audio):
+            return self.check_token(info.token)
 
         # Endpoint register
         @self.app.post("/register")
