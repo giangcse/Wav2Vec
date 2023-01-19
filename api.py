@@ -17,6 +17,7 @@ from fastapi.requests import Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.responses import FileResponse
+from starlette import status
 from pydantic import BaseModel
 from typing import Union
 
@@ -76,9 +77,9 @@ class API:
                         audios.append(i[2])
                     return JSONResponse(status_code=200, content={"data": audios})
                 else:
-                    return JSONResponse(content={"error": "Token exprited"})
+                    return JSONResponse(content={"error": "Token exprited"}, status_code=status.HTTP_401_UNAUTHORIZED)
             else:
-                return JSONResponse(content={"error": "Please login"})
+                return JSONResponse(content={"error": "Please login"}, status_code=status.HTTP_401_UNAUTHORIZED)
         # Endpoint xoá audio
         @self.app.post("/delete")
         async def delete(request: Request, body: Delete_audio):
@@ -88,11 +89,11 @@ class API:
                     deleted = self.cursor.execute("DELETE FROM audios WHERE username = ? AND audio_name = ?", (str(res), str(body.audio_name), ))
                     self.connection_db.commit()
                     # if self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (body.username, body.audio_name, )) == 0:
-                    return JSONResponse(status_code=200, content={"result": "Xoá thành công"})
+                    return JSONResponse(status_code=status.HTTP_200_OK, content={"result": "Xoá thành công"})
                 else:
-                    return JSONResponse(content={"error": "Token exprited"})
+                    return JSONResponse(content={"error": "Token exprited"}, status_code=status.HTTP_401_UNAUTHORIZED)
             else:
-                return JSONResponse(status_code=500, content={"result": "Xoá không thành công"})
+                return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"error": "Please login"})
         # Enpoint upload audio
         @self.app.post("/upload")
         async def upload(request: Request, file: UploadFile = File (...), token: str = Form(...)):
@@ -113,9 +114,10 @@ class API:
                         self.connection_db.commit()
                     return JSONResponse(status_code=200, content={'audios': [x[0] for x in self.cursor.execute("SELECT audio_name FROM audios WHERE username = ?", (str(res),))]})
                 else:
-                    return JSONResponse(content={"error": "Token exprited"})
+                    return JSONResponse(content={"error": "Token Exprited"}, status_code=status.HTTP_401_UNAUTHORIZED)
             else:
-                return JSONResponse(content={"error": "Please login"})
+                return JSONResponse(content={"error": "Please login"}, status_code=status.HTTP_401_UNAUTHORIZED)
+
         # Endpoint allow to download audio
         @self.app.post("/download_audio")
         async def download_audio(request: Request, audio: Delete_audio):
@@ -125,11 +127,11 @@ class API:
                     if os.path.exists(str(audio.audio_name)):
                         return FileResponse(audio.audio_name, media_type='application/octet-stream', filename=str(audio.audio_name).split('/')[-1])
                     else:
-                        return JSONResponse(content={"error": "File not found"})
+                        return JSONResponse(content={"error": "Audio file not found"}, status_code=status.HTTP_404_NOT_FOUND)
                 else:
-                    return JSONResponse(content={"error": "Token exprited"})
+                    return JSONResponse(content={"error": "Token Exprited"}, status_code=status.HTTP_401_UNAUTHORIZED)
             else:
-                return JSONResponse(content={"error": "Please login"})
+                return JSONResponse(content={"error": "Please login"}, status_code=status.HTTP_401_UNAUTHORIZED)
 
         # Endpoint allow to download result
         @self.app.post("/download_text")
@@ -141,20 +143,31 @@ class API:
                     if os.path.exists(str(audio.audio_name)[:-4]+'.txt'):
                         return FileResponse(str(audio.audio_name)[:-4]+'.txt', media_type='application/octet-stream',filename=(name + '.txt'))
                     else:
-                        return JSONResponse(content={"error": "File not found"})
+                        return JSONResponse(content={"error": "Text file not found"}, status_code=status.HTTP_404_NOT_FOUND)
                 else:
-                    return JSONResponse(content={"error": "Token Exprited"})
+                    return JSONResponse(content={"error": "Token Exprited"}, status_code=status.HTTP_401_UNAUTHORIZED)
             else:
-                return JSONResponse(content={"error": "Please login"})
+                return JSONResponse(content={"error": "Please login"}, status_code=status.HTTP_401_UNAUTHORIZED)
 
         # Endpoint login
         @self.app.post("/login")
         async def login(request: Request, info: User):
             token = self.create_token(info.username, info.password)
             if token is None:
-                return JSONResponse(content={"error": "Username/Password is incorrect!"})
+                return JSONResponse(content={"error": "Username/Password is incorrect!"}, status_code=status.HTTP_401_UNAUTHORIZED)
             else:
                 return JSONResponse(content={"status": "Login success", "token": str(token)}, status_code=200)
+
+        # Endpoint logout
+        @self.app.post("/logout")
+        async def logout(request: Request, info: Get_audio):
+            token = self.check_token(info.token)
+            if token is not False:
+                if token != 'Invailid token':
+                    update = self.cursor.execute("UPDATE users SET token_exp = ? WHERE token = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), str(token), ))
+                    self.connection_db.commit()    
+            return JSONResponse(content={"contet": "Logout success"}, status_code=status.HTTP_200_OK)
+                
 
         # Endpoint register
         @self.app.post("/register")
@@ -164,9 +177,9 @@ class API:
             try:
                 insert = self.cursor.execute("INSERT INTO users(username, password) VALUES ('{}', '{}')".format(str(username), hashlib.sha512(password.encode()).hexdigest()))
                 self.connection_db.commit()
-                return JSONResponse(content={"success": "Created"})
+                return JSONResponse(content={"success": "Created"}, status_code=status.HTTP_201_CREATED)
             except sqlite3.IntegrityError:
-                return JSONResponse(content={"error": "Username is exist"})
+                return JSONResponse(content={"error": "Username is exist"}, status_code=status.HTTP_409_CONFLICT)
         # endpoint websocket
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
@@ -243,9 +256,9 @@ class API:
                     log_file.close()
                     return JSONResponse(status_code=200, content={"result": return_data, "file_result": (data['audio'])[:-4] + '.txt'})
                 else:
-                    return JSONResponse(content={"error": "Token exprited"})
+                    return JSONResponse(content={"error": "Token exprited"}, status_code=status.HTTP_401_UNAUTHORIZED)
             else:
-                return JSONResponse(content={"error": "Please login"})
+                return JSONResponse(content={"error": "Please login"}, status_code=status.HTTP_401_UNAUTHORIZED)
             
 
     def create_token(self, username, password):
