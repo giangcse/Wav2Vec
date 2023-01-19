@@ -171,7 +171,11 @@ class API:
         # Endpoint check token exp
         @self.app.post("/check_token")
         async def check_token_endpoint(request: Request, info: Get_audio):
-            return self.check_token(info.token)
+            token = self.check_token(info.token)
+            if token is not False and token != "Invailid token":
+                return JSONResponse(status_code=status.HTTP_200_OK, content={"success": "Token vailid"})
+            else:
+                return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"error": "Token invailid"})
 
         # Endpoint register
         @self.app.post("/register")
