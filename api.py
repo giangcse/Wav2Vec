@@ -193,10 +193,10 @@ class API:
             elif res=='-1':
                 return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"Error": "Token expired"})
             else:
-                select = self.cursor.execute("SELECT content FROM audios WHERE username = ? AND audio_name = ?", (str(res), str(audio.audio_name), ))
+                select = self.cursor.execute("SELECT content, updated_at FROM audios WHERE username = ? AND audio_name = ?", (str(res), str(audio.audio_name), ))
                 result = select.fetchone()
                 if result is not None:
-                    return JSONResponse(content={"Text": result[0]}, status_code=status.HTTP_200_OK)
+                    return JSONResponse(content={"Text": result[0], "Time": result[1]}, status_code=status.HTTP_200_OK)
                 else:
                     return JSONResponse(content={"Error": "Text not found"}, status_code=status.HTTP_404_NOT_FOUND)
             
