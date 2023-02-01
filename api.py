@@ -335,21 +335,24 @@ class API:
         
         - ouput (str): username: thành công, -1: Token hết hạn, 0: Token không tồn tại 
         '''
-        find = self.cursor.execute("SELECT * FROM users WHERE token = ?", (str(token), ))
-        res = find.fetchall()
-        if res is None:
-            return str(0)
-        else:
-            try:
-                now = datetime.datetime.now()
-                exp = datetime.datetime.strptime(res[0][3], "%Y-%m-%d %H:%M:%S")
-                est = exp - now
-                if(est.total_seconds() > 0):
-                    return res[0][0]
-                else:
+        if token!='':
+            find = self.cursor.execute("SELECT * FROM users WHERE token = ?", (str(token), ))
+            res = find.fetchall()
+            if res is None:
+                return str(0)
+            else:
+                try:
+                    now = datetime.datetime.now()
+                    exp = datetime.datetime.strptime(res[0][3], "%Y-%m-%d %H:%M:%S")
+                    est = exp - now
+                    if(est.total_seconds() > 0):
+                        return res[0][0]
+                    else:
+                        return str(-1)
+                except Exception:
                     return str(-1)
-            except Exception:
-                return str(-1)
+        else:
+            return str(-1)
             
 api = API()
 
