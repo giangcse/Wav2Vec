@@ -204,12 +204,13 @@ class API:
         # Endpoint check token exp
         @self.app.post("/check_token")
         async def check_token_endpoint(request: Request, info: User_token):
-            token = self.check_token(info.token)
-            if token is not False and token != "Invailid token":
-                return JSONResponse(status_code=status.HTTP_200_OK, content={"success": "Token vailid"})
+            res = self.check_token(info.token)
+            if res=='0':
+                return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"Error": "Token does not exists"})
+            elif res=='-1':
+                return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"Error": "Token expired"})
             else:
-                return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"error": "Token invailidode"})
-
+                return JSONResponse(status_code=status.HTTP_200_OK, content={"Success": "Token is vailid"})
         # endpoint websocket
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
