@@ -230,13 +230,19 @@ class API:
                 _word_count_result = _word_count_query.fetchall()
                 _total_word = 0
                 for i in _word_count_result:
-                    _total_word += int(i[0])
+                    try:
+                        _total_word += int(i[0])
+                    except (TypeError, AttributeError):
+                        _total_word += 0
                 # Get total length
-                _duration_audio_query = self.cursor.execute("SELECT (length(content) - length(replace(content, ' ', ''))) + 1 AS word_count FROM audios WHERE content IS NOT NULL AND username = ?", (res, ))
+                _duration_audio_query = self.cursor.execute("SELECT audio_length FROM audios WHERE content IS NOT NULL AND username = ?", (res, ))
                 _duration_audio_result = _duration_audio_query.fetchall()
                 _total_length = 0
                 for i in _duration_audio_result:
-                    _total_length += int(i[0])
+                    try:
+                        _total_length += int(i[0])
+                    except (TypeError, AttributeError):
+                        _total_length += 0
                 return JSONResponse(status_code=status.HTTP_200_OK, content={"Total": {"Words": _total_word, "Duration": _total_length}})
 
         # endpoint websocket
