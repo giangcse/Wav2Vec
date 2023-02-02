@@ -35,6 +35,11 @@ class User(BaseModel):
     username: str
     password: str
 
+class Register(BaseModel):
+    username: str
+    password: str
+    fullname: str
+
 class Convert(BaseModel):
     audio_path: str
     token: str
@@ -68,11 +73,12 @@ class API:
 
         # Endpoint register
         @self.app.post("/register")
-        async def register(request: Request, info: User):
+        async def register(request: Request, info: Register):
             username = info.username
             password = info.password
+            fullname = info.fullname
             try:
-                insert = self.cursor.execute("INSERT INTO users(username, password) VALUES ('{}', '{}')".format(str(username), hashlib.sha512(password.encode()).hexdigest()))
+                insert = self.cursor.execute("INSERT INTO users(username, password, fullname) VALUES ('{}', '{}', '{}')".format(str(username), hashlib.sha512(password.encode()).hexdigest(), str(fullname)))
                 self.connection_db.commit()
                 return JSONResponse(content={"Success": "Created"}, status_code=status.HTTP_201_CREATED)
             except sqlite3.IntegrityError:
@@ -90,7 +96,8 @@ class API:
             elif result=='-1':
                 return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"Error": "Username does not exists"})
             else:
-                return JSONResponse(status_code=status.HTTP_200_OK, content={"Success": "Login success", "token": result})
+                fullname = self.cursor.execute("SELECT fullname FROM users WHERE username = ?", (str(username), )).fetchone()
+                return JSONResponse(status_code=status.HTTP_200_OK, content={"Success": "Login success", "token": result, "fullname": fullname[0]})
 
         # Endpoint logout
         @self.app.post("/logout")
