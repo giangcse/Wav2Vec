@@ -11,7 +11,7 @@ import difflib
 import re
 import hashlib
 import string, random
-import multiprocessing
+import audioread
 
 from fastapi import FastAPI, Form, File, UploadFile, WebSocket, Header, BackgroundTasks
 from fastapi.requests import Request
@@ -157,14 +157,18 @@ class API:
                         os.mkdir(os.path.join('audio', res))
                     with open(os.path.join('audio', res, file.filename), 'wb') as audio:
                         shutil.copyfileobj(file.file, audio)
-                    find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
-                    if find.fetchone()[0] == 0:
-                        insert = self.cursor.execute("INSERT INTO audios(username, audio_name, created_at, updated_at) VALUES (?, ?, ?, ?)", (res, os.path.join('audio', res, file.filename), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
-                        self.connection_db.commit()
+                    audio_length = self.get_audio_length(os.path.join('audio', res, file.filename))
+                    if audio_length != (-1):
+                        find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
+                        if find.fetchone()[0] == 0:
+                            insert = self.cursor.execute("INSERT INTO audios(username, audio_name, audio_length, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", (res, os.path.join('audio', res, file.filename), int(audio_length), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                            self.connection_db.commit()
+                        else:
+                            update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
+                            self.connection_db.commit()
+                        return JSONResponse(status_code=status.HTTP_200_OK, content={"Success": "Uploaded", 'Audios': [x[0] for x in self.cursor.execute("SELECT audio_name FROM audios WHERE username = ?", (str(res),))]})
                     else:
-                        update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
-                        self.connection_db.commit()
-                    return JSONResponse(status_code=status.HTTP_200_OK, content={"Success": "Uploaded", 'Audios': [x[0] for x in self.cursor.execute("SELECT audio_name FROM audios WHERE username = ?", (str(res),))]})
+                        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"Error": "File does not support"})
                 except Exception:
                     return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"Error": "Internal server error"})
 
@@ -211,6 +215,30 @@ class API:
                 return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"Error": "Token expired"})
             else:
                 return JSONResponse(status_code=status.HTTP_200_OK, content={"Success": "Token is vailid"})
+
+        # Endpoint get detail
+        @self.app.post("/get_detail")
+        async def get_detail(request: Request, info: User_token):
+            res = self.check_token(info.token)
+            if res=='0':
+                return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"Error": "Token does not exists"})
+            elif res=='-1':
+                return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"Error": "Token expired"})
+            else:
+                # Get total word
+                _word_count_query = self.cursor.execute("SELECT (length(content) - length(replace(content, ' ', ''))) + 1 AS word_count FROM audios WHERE username = ?", (res, ))
+                _word_count_result = _word_count_query.fetchall()
+                _total_word = 0
+                for i in _word_count_result:
+                    _total_word += int(i[0])
+                # Get total length
+                _duration_audio_query = self.cursor.execute("SELECT (length(content) - length(replace(content, ' ', ''))) + 1 AS word_count FROM audios WHERE content IS NOT NULL AND username = ?", (res, ))
+                _duration_audio_result = _duration_audio_query.fetchall()
+                _total_length = 0
+                for i in _duration_audio_result:
+                    _total_length += int(i[0])
+                return JSONResponse(status_code=status.HTTP_200_OK, content={"Total": {"Words": _total_word, "Duration": _total_length}})
+
         # endpoint websocket
         @self.app.websocket("/ws")
         async def websocket_endpoint(websocket: WebSocket):
@@ -282,24 +310,28 @@ class API:
                     with open(os.path.join('audio', res, file.filename), 'wb') as audio:
                         shutil.copyfileobj(file.file, audio)
                     
-                    find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
-                    if find.fetchone()[0] == 0:
-                        insert = self.cursor.execute("INSERT INTO audios(username, audio_name, created_at, updated_at) VALUES (?, ?, ?, ?)", (res, os.path.join('audio', res, file.filename), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                    audio_length = self.get_audio_length(os.path.join('audio', res, file.filename))
+                    if audio_length != (-1):
+                        find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
+                        if find.fetchone()[0] == 0:
+                            insert = self.cursor.execute("INSERT INTO audios(username, audio_name, audio_length, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", (res, os.path.join('audio', res, file.filename), int(audio_length), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                            self.connection_db.commit()
+                        else:
+                            update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
+                            self.connection_db.commit()
+
+                        # upload is done, convert speech to text phase
+                        return_string_1 = ''
+                        return_string_2 = ''
+                        return_data = ''
+                        data = {'audio': os.path.join('audio', res, file.filename), 'keyframe': int(keyframe), 'LM': int(enable_lm)}
+
+                        return_data = self.STT.convert(file_path=os.path.join('audio', res, file.filename), key_frame=int(keyframe), enable_lm=int(enable_lm), model='')
+                        update_result = self.cursor.execute("UPDATE audios SET content = ?, updated_at = ? WHERE username = ? AND audio_name = ?", (return_data, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
                         self.connection_db.commit()
+                        return JSONResponse(status_code=status.HTTP_200_OK, content={"Result": return_data})
                     else:
-                        update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
-                        self.connection_db.commit()
-
-                    # upload is done, convert speech to text phase
-                    return_string_1 = ''
-                    return_string_2 = ''
-                    return_data = ''
-                    data = {'audio': os.path.join('audio', res, file.filename), 'keyframe': int(keyframe), 'LM': int(enable_lm)}
-
-                    return_data = self.STT.convert(file_path=os.path.join('audio', res, file.filename), key_frame=int(keyframe), enable_lm=int(enable_lm), model='')
-                    update_result = self.cursor.execute("UPDATE audios SET content = ?, updated_at = ? WHERE username = ? AND audio_name = ?", (return_data, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
-                    self.connection_db.commit()
-                    return JSONResponse(status_code=status.HTTP_200_OK, content={"Result": return_data})
+                        return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"Error": "File does not support"})
 
     def convert_stt(self, audio_path, enable_lm, key_frame):
         result = self.STT.convert(audio_path, enable_lm, key_frame, '')
@@ -355,6 +387,21 @@ class API:
         else:
             return str(-1)
             
+    # Get duration of audio
+    def get_audio_length(self, audio_path):
+        '''
+        GET AUDIO LENGTH FUNC.
+        -----
+        - input (str): audio path
+        
+        - output (float): độ dài audio (s) nếu đúng, nếu không đọc được thì return lỗi là str(-1)
+        '''
+        try:
+            with audioread.audio_open(audio_path) as f:
+                return (f.duration)
+        except Exception:
+            return (-1)
+        
 api = API()
 
 if __name__=='__main__':
