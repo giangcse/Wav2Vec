@@ -389,7 +389,7 @@ class API:
             else:
                 try:
                     now = datetime.datetime.now()
-                    exp = datetime.datetime.strptime(res[0][3], "%Y-%m-%d %H:%M:%S")
+                    exp = datetime.datetime.strptime(res[0][4], "%Y-%m-%d %H:%M:%S")
                     est = exp - now
                     if(est.total_seconds() > 0):
                         return res[0][0]
