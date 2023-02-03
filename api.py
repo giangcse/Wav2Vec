@@ -142,10 +142,14 @@ class API:
                 return JSONResponse(status_code=status.HTTP_401_UNAUTHORIZED, content={"Error": "Token expired"})
             else:
                 try:
-                    deleted = self.cursor.execute("DELETE FROM audios WHERE username = ? AND audio_name = ?", (str(res), str(body.audio_name), ))
-                    self.connection_db.commit()
-                    # if self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (body.username, body.audio_name, )) == 0:
-                    return JSONResponse(status_code=status.HTTP_200_OK, content={"Success": "Audio has been deleted"})
+                    if(os.path.exists(body.audio_name)):
+                        deleted = self.cursor.execute("DELETE FROM audios WHERE username = ? AND audio_name = ?", (str(res), str(body.audio_name), ))
+                        self.connection_db.commit()
+                        os.remove(body.audio_name)
+                        # if self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (body.username, body.audio_name, )) == 0:
+                        return JSONResponse(status_code=status.HTTP_200_OK, content={"Success": "Audio has been deleted"})
+                    else:
+                        return JSONResponse(status_code=status.HTTP_404_NOT_FOUND, content={"Error": "File not found"})
                 except Exception:
                     return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"Error": "Internal server error"})
 
@@ -418,4 +422,4 @@ class API:
 api = API()
 
 if __name__=='__main__':
-    uvicorn.run('api:api.app', host='0.0.0.0', port=9090, reload=True)
+    uvicorn.run('api:api.app', host='0.0.0.0', port=9190, reload=True)
