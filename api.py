@@ -128,7 +128,7 @@ class API:
                 find = self.cursor.execute("SELECT * FROM audios WHERE username = ?", (str(res), ))
                 audios = []
                 for i in find.fetchall():
-                    audios.append({"path": i[1], "duration": i[2], "content": i[3]})
+                    audios.append({"path": i[2], "duration": i[3], "content": i[4], "update_at": i[6]})
                 return JSONResponse(status_code=status.HTTP_200_OK, content={"data": audios})
 
         # Endpoint xoá audio
