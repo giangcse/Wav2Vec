@@ -2,15 +2,11 @@
 
 import json
 import os, zipfile, sys
-import uvicorn
 import torch
 import kenlm
 import librosa
 import numpy as np
 import datetime
-
-from fastapi import FastAPI, WebSocket
-from fastapi.middleware.cors import CORSMiddleware
 
 sys.path.insert(1,os.path.abspath('py37/pyctcdecode1'))
 # from pyctcdecode import Alphabet, BeamSearchDecoderCTC, LanguageModel
@@ -74,11 +70,8 @@ class BaseVietnamese_Model:
         with open('config.json', encoding='utf8') as f:
             config = json.loads(f.read())
         # data = json.loads(data)
-        if (int(data['denoise'])==0):
-            y, sr = librosa.load(data['audio'], mono=False, sr=16000)
-            y_mono = librosa.to_mono(y)
-        else:
-            y_mono = self.DA.denoise(data['audio'])
+        y, sr = librosa.load(data['audio'], mono=False, sr=16000)
+        y_mono = librosa.to_mono(y)
         chunk_duration = config['chunk_duration'] # sec
         padding_duration = config['padding_duration'] # sec
         sample_rate = config['sample_rate']
@@ -106,18 +99,3 @@ class BaseVietnamese_Model:
             sec += chunk_duration
             yield return_data
         log_file.close()
-
-class DenoiseAudio:
-    def __init__(self) -> None:
-        self.model = separator.from_hparams(source="speechbrain/sepformer-wham16k-enhancement", savedir='models/sepformer-wham16k-enhancement')
-        print('[INFO]\t{}'.format('Denoise model has been loaded'))
-
-    def denoise(self, audio_path):
-        if(os.path.exists(audio_path)):
-            est_sources = self.model.separate_file(path=audio_path)
-            try:
-                mono_audio = (est_sources[:, :, 0].detach().cpu())[0].numpy()
-                return mono_audio
-            except Exception:
-                return Exception
-
