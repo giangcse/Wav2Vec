@@ -6,9 +6,7 @@ import shutil
 import sqlite3
 import datetime
 import websockets
-import asyncio
-import difflib
-import re
+import time
 import hashlib
 import string, random
 import audioread
@@ -168,14 +166,16 @@ class API:
                         os.mkdir(os.path.join('audio', res))
                     with open(os.path.join('audio', res, file.filename), 'wb') as audio:
                         shutil.copyfileobj(file.file, audio)
-                    audio_length = self.get_audio_length(os.path.join('audio', res, file.filename))
+                    newFileName = str(file.filename).split('.wav')[0] + '_' + str(int(time.time())) + '.wav'
+                    os.rename(os.path.join('audio', res, file.filename), os.path.join('audio', res, newFileName))
+                    audio_length = self.get_audio_length(os.path.join('audio', res, newFileName))
                     if audio_length != (-1):
-                        find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
+                        find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, newFileName), ))
                         if find.fetchone()[0] == 0:
-                            insert = self.cursor.execute("INSERT INTO audios(username, audio_name, audio_length, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", (res, os.path.join('audio', res, file.filename), int(audio_length), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
+                            insert = self.cursor.execute("INSERT INTO audios(username, audio_name, audio_length, created_at, updated_at) VALUES (?, ?, ?, ?, ?)", (res, os.path.join('audio', res, newFileName), int(audio_length), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")))
                             self.connection_db.commit()
                         else:
-                            update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
+                            update = self.cursor.execute("UPDATE audios SET updated_at = ? WHERE username = ? AND audio_name = ?", (datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, newFileName)))
                             self.connection_db.commit()
                         return JSONResponse(status_code=status.HTTP_200_OK, content={"Success": "Uploaded", 'Audios': [x[0] for x in self.cursor.execute("SELECT audio_name FROM audios WHERE username = ?", (str(res),))]})
                     else:
@@ -326,8 +326,10 @@ class API:
                         os.mkdir(os.path.join('audio', res))
                     with open(os.path.join('audio', res, file.filename), 'wb') as audio:
                         shutil.copyfileobj(file.file, audio)
+                    newFileName = str(file.filename).split('.wav')[0] + '_' + str(int(time.time())) + '.wav'
+                    os.rename(os.path.join('audio', res, file.filename), os.path.join('audio', res, newFileName))
+                    audio_length = self.get_audio_length(os.path.join('audio', res, newFileName))
                     
-                    audio_length = self.get_audio_length(os.path.join('audio', res, file.filename))
                     if audio_length != (-1):
                         find = self.cursor.execute("SELECT EXISTS (SELECT * FROM audios WHERE username = ? AND  audio_name = ?)", (res, os.path.join('audio', res, file.filename), ))
                         if find.fetchone()[0] == 0:
@@ -346,7 +348,7 @@ class API:
                         return_data = self.STT.convert(file_path=os.path.join('audio', res, file.filename), key_frame=int(keyframe), enable_lm=int(enable_lm), model='')
                         update_result = self.cursor.execute("UPDATE audios SET content = ?, updated_at = ? WHERE username = ? AND audio_name = ?", (return_data, datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"), res, os.path.join('audio', res, file.filename)))
                         self.connection_db.commit()
-                        return JSONResponse(status_code=status.HTTP_200_OK, content={"Result": return_data})
+                        return JSONResponse(status_code=status.HTTP_200_OK, content={"Result": return_data}, headers={"Content Type": "application/json", "access-control-allow-credentials": "true", "access-control-allow-origin": "*"})
                     else:
                         return JSONResponse(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, content={"Error": "File does not support"})
 
